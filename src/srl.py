@@ -102,11 +102,10 @@ class SRLLSTM:
     def decode(self, minibatches):
         outputs = [list() for _ in range(len(minibatches))]
         for b, batch in enumerate(minibatches):
+            print 'batch '+ str(b)
             outputs[b] = concatenate_cols(self.buildGraph(batch, False)).npvalue()
             renew_cg()
-
-        print 'minibatch length: '+ str(len(minibatches))
-        print 'outputs length: '+str(len(outputs))
+        print 'decoded all the batches! YAY!'
         outputs = np.concatenate(outputs, axis=1)
         return outputs.T
 
@@ -160,12 +159,18 @@ class SRLLSTM:
 
 
     def Predict(self, conll_path):
+        print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
+        print 'input data read...'
         for d in dev_data:
             dev_buckets[0].append(d)
         minibatches = get_batches(dev_buckets, self, False)
+        print 'created minibatches...'
+        print 'minibatch size: '+ str(len(minibatches))
+        print 'trying to decode minibatches...'
         outputs = self.decode(minibatches)
+        print 'outputs are returned!'
         results = [self.iroles[np.argmax(outputs[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
