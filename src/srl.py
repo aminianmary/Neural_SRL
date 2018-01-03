@@ -165,6 +165,7 @@ class SRLLSTM:
         print 'input data read...'
         for d in dev_data:
             dev_buckets[0].append(d)
+        print 'dev buckets are ready!'
         minibatches = get_batches(dev_buckets, self, False)
         print 'created minibatches...'
         print 'minibatch size: '+ str(len(minibatches))
