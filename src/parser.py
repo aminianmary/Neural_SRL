@@ -9,6 +9,8 @@ if __name__ == '__main__':
     parser.add_option("--train", dest="conll_train", help="Annotated CONLL train file", metavar="FILE", default=None)
     parser.add_option("--dev", dest="conll_dev", help="Annotated CONLL dev file", metavar="FILE", default='')
     parser.add_option("--input", dest="input", help="Annotated CONLL test file", metavar="FILE", default=None)
+    parser.add_option("--inputdir", dest="inputdir", help="Directory containing test files", metavar="FILE", default=None)
+    parser.add_option("--outputdir", dest="outputdir", help="Directory containing output files", metavar="FILE", default=None)
     parser.add_option("--output", dest="output", help="output file", metavar="FILE", default=None)
     parser.add_option("--params", dest="params", help="Parameters file", metavar="FILE", default="params")
     parser.add_option("--extrn", dest="external_embedding", help="External embeddings", metavar="FILE")
@@ -95,4 +97,19 @@ if __name__ == '__main__':
         pred = list(parser.Predict(options.input))
         te = time.time()
         utils.write_conll(options.output, pred)
+        print 'Finished predicting test', te - ts
+
+    if options.inputdir and options.outputdir:
+        with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
+            words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+        stored_opt.external_embedding = options.external_embedding
+        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser.Load(os.path.join(options.outdir, options.model))
+        ts = time.time()
+        for dir, subdir, files in os.walk(options.inputdir):
+            for f in files:
+                print 'predicting '+ os.path.join(dir,f)
+                pred = list(parser.Predict(os.path.join(dir,f)))
+                utils.write_conll(options.outputdir+'/'+f+'.srl', pred)
+        te = time.time()
         print 'Finished predicting test', te - ts
