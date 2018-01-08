@@ -83,8 +83,7 @@ def read_conll(fh):
                 predicates.append(int(spl[0]) - 1)
 
             for i in range(14, len(spl)):
-                if spl[i] != '?':
-                    predicateList[i - 14] = spl[i]
+                predicateList[i - 14] = spl[i]
 
             words.append(
                 ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], int(spl[9]), spl[11], predicateList,
