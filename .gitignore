@@ -1,6 +1,12 @@
 
 *.pyc
+<<<<<<< HEAD
 
 *.xml
 
 *.iml
+=======
+.idea
+.idea/vcs.xml
+data
+>>>>>>> origin/maryam_mod
