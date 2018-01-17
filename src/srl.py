@@ -83,6 +83,7 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch):
         words, pwords, pos, chars, roles, masks = minibatch
+        print masks.dim()
         bilstms = self.rnn(words, pwords, pos, chars)
         bilstms_ = concatenate_cols(bilstms)
         hidden = rectify(affine_transform([self.hidden_bias.expr(), self.hidden.expr(), bilstms_]))
