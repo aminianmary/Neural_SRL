@@ -142,9 +142,10 @@ def add_to_minibatch(batch, max_char_len, max_w_len, mini_batches, model):
 
     # For all characters in all words in all sentences, put them all in a tensor except the ones that are outside the boundary of the sentence.
     # todo: fix this for other branches as well.
-    chars = np.array([[[model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 <= j < len(batch[i]) and c < len(
-        batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(num_sen)] for j in range(max_w_len)] for
-                      c in range(max_char_len)])
+    chars = np.array([[[
+        model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 <= j < len(batch[i]) and c < len(batch[i][j].form)
+        else (1 if j == 0 and c == 0 else 0)
+        for i in range(num_sen)] for j in range(max_w_len)] for c in range(max_char_len)])
     chars = np.transpose(np.reshape(chars, (num_sen * max_w_len, max_char_len)))
 
     roles = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].is_pred else 0 for i in range(len(batch))]) for j in range(max_w_len)])
