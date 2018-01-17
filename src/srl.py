@@ -150,9 +150,12 @@ class SRLLSTM:
 
                 if dev_path != '':
                     start = time.time()
+                    p = self.Predict(dev_path)
+                    pred = p[0]
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path))
-                    f_score =evaluate(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',dev_path)
+                                      pred)
+                    #f_score = evaluate(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',dev_path)
+                    f_score = (2  * p[1] * p[2])/(p[1] + p[2])
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
                     print 'epoch: ' + str(epoch) + ' part: '+ str(part) + '-- F-Score: ' + str(f_score)
 
@@ -168,18 +171,28 @@ class SRLLSTM:
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
-        print 'input data read...'
         for d in dev_data:
             dev_buckets[0].append(d)
-        print 'dev buckets are ready!'
         minibatches = get_batches(dev_buckets, self, False)
-        print 'created minibatches...'
-        print 'minibatch size: '+ str(len(minibatches))
-        print 'trying to decode minibatches...'
         results = self.decode(minibatches)
-        print 'outputs are returned!'
+        tp, fp, tn, fn =0,0,0,0
         for iSentence, sentence in enumerate(dev_data):
             for arg_index in xrange(len(sentence.entries)):
-                is_pred = True if results[iSentence][arg_index] == 1 else False
-                sentence.entries[arg_index].is_pred = is_pred
-            yield sentence
+                prediction = True if results[iSentence][arg_index] == 1 else False
+                gold = sentence.entries[arg_index].is_pred
+
+                if gold == True:
+                    if prediction ==True:
+                        tp+=1
+                    else:
+                        fn+=1
+                else:
+                    if prediction ==True:
+                        fp+=1
+                    else:
+                        tn+=1
+                sentence.entries[arg_index].is_pred = prediction
+        precision = float(tp) / (tp + fp)
+        recall = float(tp) / (tp + fn)
+
+        return (dev_data , precision, recall)
