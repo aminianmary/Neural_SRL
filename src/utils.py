@@ -111,65 +111,67 @@ def get_batches(buckets, model, is_train):
         for dc in d_copy:
             random.shuffle(dc)
     mini_batches = []
-    batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
+    batch, cur_len, cur_c_len = [], 0, 0
     for dc in d_copy:
         for d in dc:
             if (is_train and len(d)<=100) or not is_train:
-                for p, predicate in enumerate(d.predicates):
-                    batch.append(d.entries)
-                    pred_ids.append([p,predicate])
-                    cur_c_len = max(cur_c_len, max([len(w.norm) for w in d.entries]))
-                    cur_len = max(cur_len, len(d))
+                batch.append(d.entries)
+                cur_c_len = max(cur_c_len, max([len(w.norm) for w in d.entries]))
+                cur_len = max(cur_len, len(d))
 
             if cur_len * len(batch) >= model.options.batch:
-                add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model)
-                batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
+                add_to_minibatch(batch, cur_c_len, cur_len, mini_batches, model)
+                batch, cur_len, cur_c_len = [], 0, 0
 
     if len(batch)>0 and not is_train:
-        add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model)
+        add_to_minibatch(batch, cur_c_len, cur_len, mini_batches, model)
     if is_train:
         random.shuffle(mini_batches)
     return mini_batches
 
-
-def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
+def add_to_minibatch(batch, max_char_len, max_w_len, mini_batches, model):
+    num_sen = len(batch)
     words = np.array([np.array(
-        [model.words.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
+        [model.word_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in range(num_sen)]) for j in range(max_w_len)])
     pwords = np.array([np.array(
         [model.x_pe_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
+         range(num_sen)]) for j in range(max_w_len)])
     pos = np.array([np.array(
-        [model.pos.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
-    lemmas = np.array([np.array(
-        [(model.pred_lemmas.get(batch[i][j].lemma, 0) if pred_ids[i][1]==j else model.NO_LEMMA)if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
-    pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0) if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
-    pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
-    roles = np.array([np.array(
-        [model.roles.get(batch[i][j].predicateList[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
-    chars = np.array([[[model.chars.get(batch[i][j].form[c].lower(), 0) if 0 < j < len(batch[i]) and c < len(
-        batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(len(batch))] for j in range(cur_len)] for
-                      c in range(cur_c_len)])
-    chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
-    masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pwords, pos, lemmas, pred_lemmas, pred_lemmas_index, chars, roles, pred_flags, masks))
+        [model.pos_dict.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD for i in
+         range(num_sen)]) for j in range(max_w_len)])
+
+    # For all characters in all words in all sentences, put them all in a tensor except the ones that are outside the boundary of the sentence.
+    # todo: fix this for other branches as well.
+    chars = np.array([[[model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 <= j < len(batch[i]) and c < len(
+        batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(num_sen)] for j in range(max_w_len)] for
+                      c in range(max_char_len)])
+    chars = np.transpose(np.reshape(chars, (num_sen * max_w_len, max_char_len)))
+
+    roles = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].is_pred else 0 for i in range(len(batch))]) for j in range(max_w_len)])
+    masks = np.array([np.array([1 if j < len(batch[i]) else 0 for i in range(num_sen)]) for j in range(max_w_len)])
+
+    mini_batches.append((words, pwords, pos, chars, roles, masks))
+
+def evaluate(output, gold):
+    tp, fp, tn, fn = 0, 0, 0, 0
+    gold_sentences = read_conll(gold)
+    auto_sentences = read_conll(output)
+
+    for g_s, a_s in zip (gold_sentences, auto_sentences):
+        g_predicates = g_s.predicates
+        a_predicates = a_s.predicates
+
+        for a_p in a_predicates:
+            if a_p in g_predicates:
+                tp+=1
+            else:
+                fp+=1
+        for g_p in g_predicates:
+            if not g_p in a_predicates:
+                fn+=1
+    precision = float (tp)/(tp+fp)
+    recall = float (tp)/(tp+fn)
+    return 2*(precision*recall)/(precision+recall)
 
 
-def get_scores(fp):
-    labeled_f = 0
-    unlabeled_f = 0
-    line_counter =0
-    with codecs.open(fp, 'r') as fr:
-        for line in fr:
-            line_counter+=1
-            if line_counter == 10:
-                spl = line.strip().split(' ')
-                labeled_f= spl[len(spl)-1]
-            if line_counter==13:
-                spl = line.strip().split(' ')
-                unlabeled_f = spl[len(spl) - 1]
-    return (labeled_f, unlabeled_f)
+
