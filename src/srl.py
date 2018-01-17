@@ -81,8 +81,7 @@ class SRLLSTM:
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
         return inputs
 
-    def buildGraph(self, minibatch, is_train):
-        outputs = []
+    def buildGraph(self, minibatch):
         words, pwords, pos, chars, roles, masks = minibatch
         bilstms = self.rnn(words, pwords, pos, chars)
         bilstms_ = concatenate_cols(bilstms)
@@ -95,7 +94,7 @@ class SRLLSTM:
         outputs = []
         for b, batch in enumerate(minibatches):
             print 'batch '+ str(b)
-            output = self.buildGraph(batch, False).npvalue().T
+            output = self.buildGraph(batch).npvalue().T
             argmax_vals = [np.argmax(o) for o in output]
             mask = batch[-1]
             num_sens, num_words = mask.shape[1], mask.shape[0]
@@ -122,7 +121,7 @@ class SRLLSTM:
         best_part = 0
 
         for b, mini_batch in enumerate(mini_batches):
-            output  = self.buildGraph(mini_batch, True)
+            output  = self.buildGraph(mini_batch)
             words, pwords, pos, chars, roles, masks = mini_batch
             num_roles = roles.shape[0] * roles.shape[1]
             roles = np.reshape(roles, num_roles)
