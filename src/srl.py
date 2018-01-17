@@ -87,6 +87,7 @@ class SRLLSTM:
         bilstms_ = concatenate_cols(bilstms)
         hidden = rectify(affine_transform([self.hidden_bias.expr(), self.hidden.expr(), bilstms_]))
         output = affine_transform([self.out_bias.expr(), self.out_layer.expr(), hidden])
+        print output.dim()
         output_reshape = reshape(output, (output.dim()[0][0],), output.dim()[0][1] * output.dim()[1])
         return output_reshape
 
