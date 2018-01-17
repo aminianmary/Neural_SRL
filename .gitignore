@@ -1,6 +1,5 @@
 
 *.pyc
-<<<<<<< HEAD
 
 *.xml
 
@@ -9,4 +8,3 @@
 .idea
 .idea/vcs.xml
 data
->>>>>>> origin/maryam_mod
