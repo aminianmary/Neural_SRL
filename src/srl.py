@@ -75,17 +75,17 @@ class SRLLSTM:
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]), lookup_batch(self.x_pos, pos[i]), cnn_reps[i]]) for i in range(len(words))]
 
-        print 'lstm input dim', inputs[0].dim()
+        #print 'lstm input dim', inputs[0].dim()
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
-        print 'lstm output dim', inputs[0].dim()
+        #print 'lstm output dim', inputs[0].dim()
         return inputs
 
     def buildGraph(self, minibatch):
         words, pwords, pos, chars, roles, masks = minibatch
-        print words.shape, pwords.shape, pos.shape, roles.shape, masks.shape, chars.shape
+        #print words.shape, pwords.shape, pos.shape, roles.shape, masks.shape, chars.shape
         bilstms = self.rnn(words, pwords, pos, chars)
         bilstms_ = concatenate_cols(bilstms)
         hidden = rectify(affine_transform([self.hidden_bias.expr(), self.hidden.expr(), bilstms_]))
