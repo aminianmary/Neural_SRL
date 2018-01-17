@@ -90,7 +90,7 @@ class SRLLSTM:
         bilstms_ = concatenate_cols(bilstms)
         hidden = rectify(affine_transform([self.hidden_bias.expr(), self.hidden.expr(), bilstms_]))
         output = affine_transform([self.out_bias.expr(), self.out_layer.expr(), hidden])
-        print output.dim()
+        #print output.dim()
         dim_0_1 = output.dim()[0][1] if words.shape[0]!=1 else 1
         output_reshape = reshape(output, (output.dim()[0][0],), dim_0_1 * output.dim()[1])
         return output_reshape
@@ -112,7 +112,6 @@ class SRLLSTM:
                     offset += 1
             outputs += batch_output
             renew_cg()
-        print 'decoded all the batches! YAY!'
         return outputs
 
     def Train(self, mini_batches, epoch, best_f_score, options):
