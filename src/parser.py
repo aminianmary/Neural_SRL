@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_option("--model", dest="model", help="Load/Save model file", metavar="FILE", default="model")
     parser.add_option("--d_c", type="int", dest="d_c", help="character embedding dimension", default=50)
     parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension", default=100)
+    parser.add_option("--d_lstm", type="int", dest="d_lstm", help="deep lstm dimension", default=512)
     parser.add_option("--d_w", type="int", dest="d_w", default=100)
     parser.add_option("--d_l", type="int", dest="d_l", default=100)
     parser.add_option("--d_pos", type="int", dest="d_pos", default=16)
