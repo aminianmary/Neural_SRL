@@ -51,9 +51,9 @@ class SRLLSTM:
         self.char_lstm = BiRNNBuilder(1, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.hidden = self.model.add_parameters((options.d_hid, 2*self.d_h))
-        self.hidden_bias = self.model.add_parameters((options.d_hid, ))
+        self.hidden_bias = self.model.add_parameters((options.d_hid, ), init= ConstInitializer(0.2))
         self.out_layer = self.model.add_parameters((2, options.d_hid))
-        self.out_bias = self.model.add_parameters((2, ))
+        self.out_bias = self.model.add_parameters((2, ), init = ConstInitializer(0))
         self.x_re = self.model.add_lookup_parameters((len(self.word_dict) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
