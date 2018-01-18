@@ -22,8 +22,6 @@ if __name__ == '__main__':
     parser.add_option("--d_w", type="int", dest="d_w", default=100)
     parser.add_option("--d_l", type="int", dest="d_l", default=100)
     parser.add_option("--d_pos", type="int", dest="d_pos", default=16)
-    parser.add_option("--d_h", type="int", dest="d_h", default=512)
-    parser.add_option("--d_hid", type="int", dest="d_hid", help="hidden layer dimension", default=512)
     parser.add_option("--d_r", type="int", dest="d_r", default=128)
     parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
     parser.add_option("--k", type="int", dest="k", default=4)

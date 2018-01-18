@@ -24,7 +24,7 @@ class SRLLSTM:
         self.d_cw = options.d_cw
         self.d_pos = options.d_pos
         self.d_l = options.d_l
-        self.d_h = options.d_h
+        #self.d_h = options.d_h
         self.d_r = options.d_r
         self.d_prime_l = options.d_prime_l
         self.k = options.k
@@ -50,8 +50,8 @@ class SRLLSTM:
         self.inp_dim = self.d_w + self.d_cw + self.d_pos + (self.edim if self.external_embedding is not None else 0)
         self.char_lstm = BiRNNBuilder(1, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
-        self.hidden = self.model.add_parameters((options.d_hid, 2*self.d_h))
-        self.hidden_bias = self.model.add_parameters((options.d_hid, ), init= ConstInitializer(0.2))
+        #self.hidden = self.model.add_parameters((options.d_hid, 2*self.d_h))
+        #self.hidden_bias = self.model.add_parameters((options.d_hid, ), init= ConstInitializer(0.2))
         self.out_layer = self.model.add_parameters((2, options.d_hid))
         self.out_bias = self.model.add_parameters((2, ), init = ConstInitializer(0))
         self.x_re = self.model.add_lookup_parameters((len(self.word_dict) + 2, self.d_w))
@@ -75,20 +75,18 @@ class SRLLSTM:
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]), lookup_batch(self.x_pos, pos[i]), cnn_reps[i]]) for i in range(len(words))]
 
-        #print 'lstm input dim', inputs[0].dim()
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
-        #print 'lstm output dim', inputs[0].dim()
         return inputs
 
     def buildGraph(self, minibatch):
         words, pwords, pos, chars, roles, masks = minibatch
         bilstms = self.rnn(words, pwords, pos, chars)
         bilstms_ = concatenate_cols(bilstms)
-        hidden = rectify(affine_transform([self.hidden_bias.expr(), self.hidden.expr(), bilstms_]))
-        output = affine_transform([self.out_bias.expr(), self.out_layer.expr(), hidden])
+        #hidden = rectify(affine_transform([self.hidden_bias.expr(), self.hidden.expr(), bilstms_]))
+        output = rectify(affine_transform([self.out_bias.expr(), self.out_layer.expr(), bilstms_]))
         dim_0_1 = output.dim()[0][1] if words.shape[0]!=1 else 1
         output_reshape = reshape(output, (output.dim()[0][0],), dim_0_1 * output.dim()[1])
         return output_reshape
