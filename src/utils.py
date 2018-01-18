@@ -29,7 +29,7 @@ class ConllEntry:
         entry_list = [str(self.id+1), self.form, self.lemma, self.lemma, self.pos, self.pos, '_', '_',
                       str(self.parent_id),
                       str(self.parent_id), self.relation, self.relation,
-                      '_' if self.sense == '_' else 'Y',
+                      '_' if self.is_pred == False else 'Y',
                       self.sense]
         for p in self.predicateList.values():
             entry_list.append(p)
