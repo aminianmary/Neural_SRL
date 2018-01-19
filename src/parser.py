@@ -21,6 +21,7 @@ if __name__ == '__main__':
     parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension", default=100)
     parser.add_option("--d_w", type="int", dest="d_w", default=100)
     parser.add_option("--d_pos", type="int", dest="d_pos", default=16)
+    parser.add_option("--d_h", type="int", dest="d_h", default=512)
     parser.add_option("--k", type="int", dest="k", default=4)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)

@@ -21,11 +21,9 @@ class SRLLSTM:
         self.iroles = roles #todo
         self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
+        self.d_h = options.d_h
         self.d_cw = options.d_cw
         self.d_pos = options.d_pos
-        self.d_l = options.d_l
-        self.d_r = options.d_r
-        self.d_prime_l = options.d_prime_l
         self.k = options.k
         self.alpha = options.alpha
         self.external_embedding = None
