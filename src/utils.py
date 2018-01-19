@@ -134,21 +134,27 @@ def get_batches(buckets, model, is_train):
 def add_to_minibatch(batch, max_char_len, max_w_len, mini_batches, model):
     num_sen = len(batch)
     words = np.array([np.array(
-        [model.word_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in range(num_sen)]) for j in range(max_w_len)])
+        [model.word_dict.get(batch[i][j].norm, model.unk_id) if j < len(batch[i]) else model.PAD for i in range(num_sen)]) for j in range(max_w_len)])
     pwords = np.array([np.array(
-        [model.x_pe_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in
+        [model.x_pe_dict.get(batch[i][j].norm, model.unk_id) if j < len(batch[i]) else model.PAD for i in
          range(num_sen)]) for j in range(max_w_len)])
     pos = np.array([np.array(
-        [model.pos_dict.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD for i in
+        [model.pos_dict.get(batch[i][j].pos, model.unk_id) if j < len(batch[i]) else model.PAD for i in
          range(num_sen)]) for j in range(max_w_len)])
 
     # For all characters in all words in all sentences, put them all in a tensor except the ones that are outside the boundary of the sentence.
     # todo: fix this for other branches as well.
-    chars = np.array([[[
-        model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 <= j < len(batch[i]) and c < len(batch[i][j].form)
-        else (1 if j == 0 and c == 0 else 0)
-        for i in range(num_sen)] for j in range(max_w_len)] for c in range(max_char_len)])
-    chars = np.transpose(np.reshape(chars, (num_sen * max_w_len, max_char_len)))
+    chars = [list() for _ in range(max_char_len)]
+    for c_position in range(max_char_len):
+        ch = [model.PAD]*(num_sen * max_w_len)
+        offset = 0
+        for word_position in range(max_w_len):
+            for sen_position in range(num_sen):
+                if word_position<len(batch[sen_position]) and c_position<len(batch[sen_position][word_position].norm):
+                    ch[offset] = model.char_dict.get(batch[sen_position][word_position].norm[c_position], model.unk_id)
+                offset+=1
+        chars[c_position] = np.array(ch)
+    chars = np.array(chars)
 
     roles = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].is_pred else 0 for i in range(len(batch))]) for j in range(max_w_len)])
     masks = np.array([np.array([1 if j < len(batch[i]) else 0 for i in range(num_sen)]) for j in range(max_w_len)])
@@ -167,6 +173,6 @@ def evaluate(output, gold):
         for a_p in a_predicates:
             if a_p in g_predicates:
               corr+=1
-    acc = float (corr)/(total) if total!=0 else 0.0
+    acc = float (corr)/total if total!=0 else 0.0
     return acc
 
