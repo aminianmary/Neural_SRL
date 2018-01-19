@@ -91,7 +91,7 @@ if __name__ == '__main__':
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
-        pred = list(parser.Predict(options.input)[0])
+        pred = list(parser.Predict(options.input))
         te = time.time()
         utils.write_conll(options.output, pred)
         print 'Finished predicting test', te - ts
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         for dir, subdir, files in os.walk(options.inputdir):
             for f in files:
                 print 'predicting ' + os.path.join(dir, f)
-                pred = list(parser.Predict(os.path.join(dir, f))[0])
+                pred = list(parser.Predict(os.path.join(dir, f)))
                 utils.write_conll(options.outputdir + '/' + f + '.srl', pred)
         te = time.time()
         print 'Finished predicting test', te - ts
