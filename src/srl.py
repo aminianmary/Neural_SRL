@@ -104,7 +104,7 @@ class SRLLSTM:
             renew_cg()
         return outputs
 
-    def Train(self, mini_batches, epoch, best_f_score, options):
+    def Train(self, mini_batches, epoch, best_acc, options):
         print 'Start time', time.ctime()
         start = time.time()
         errs,loss,iters,sen_num = [],0,0,0
@@ -141,17 +141,17 @@ class SRLLSTM:
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
                                 self.Predict(dev_path))
-                    f_score = evaluate(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',dev_path)
+                    acc = evaluate(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',dev_path)
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
-                    print 'epoch: ' + str(epoch) + ' part: '+ str(part) + '-- F-Score: ' + str(f_score)
+                    print 'epoch: ' + str(epoch) + ' part: '+ str(part) + '--Accuracy: ' + str(acc)
 
-                    if float(f_score) > best_f_score:
+                    if float(acc) > best_acc:
                         self.Save(os.path.join(options.outdir, options.model))
-                        best_f_score = float(f_score)
+                        best_acc = float(acc)
                         best_part = part
 
         print 'best part on this epoch: '+ str(best_part)
-        return best_f_score
+        return best_acc
 
     def Predict(self, conll_path):
         print 'starting to decode...'
