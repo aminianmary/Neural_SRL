@@ -25,7 +25,6 @@ class SRLLSTM:
         self.d_pos = options.d_pos
         self.d_l = options.d_l
         self.d_r = options.d_r
-        self.d_lstm = options.d_lstm
         self.d_prime_l = options.d_prime_l
         self.k = options.k
         self.alpha = options.alpha
@@ -49,8 +48,8 @@ class SRLLSTM:
 
         self.inp_dim = self.d_w + self.d_cw + self.d_pos + (self.edim if self.external_embedding is not None else 0)
         self.char_lstm = BiRNNBuilder(1, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
-        self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_lstm, self.model, VanillaLSTMBuilder)
-        self.out_layer = self.model.add_parameters((2, 2*self.d_lstm))
+        self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
+        self.out_layer = self.model.add_parameters((2, 2*self.d_h))
         self.out_bias = self.model.add_parameters((2, ), init = ConstInitializer(0))
         self.x_re = self.model.add_lookup_parameters((len(self.word_dict) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding

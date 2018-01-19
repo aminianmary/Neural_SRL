@@ -19,12 +19,8 @@ if __name__ == '__main__':
     parser.add_option("--model", dest="model", help="Load/Save model file", metavar="FILE", default="model")
     parser.add_option("--d_c", type="int", dest="d_c", help="character embedding dimension", default=50)
     parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension", default=100)
-    parser.add_option("--d_lstm", type="int", dest="d_lstm", help="deep lstm dimension", default=512)
     parser.add_option("--d_w", type="int", dest="d_w", default=100)
-    parser.add_option("--d_l", type="int", dest="d_l", default=100)
     parser.add_option("--d_pos", type="int", dest="d_pos", default=16)
-    parser.add_option("--d_r", type="int", dest="d_r", default=128)
-    parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
     parser.add_option("--k", type="int", dest="k", default=4)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
@@ -67,7 +63,6 @@ if __name__ == '__main__':
 
         for epoch in xrange(options.epochs):
             print 'Starting epoch', epoch
-            print 'best F-score before starting the epoch: ' + str(best_f_score)
             best_f_score = parser.Train(utils.get_batches(buckets, parser, True), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 

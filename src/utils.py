@@ -101,9 +101,11 @@ def write_conll(fn, conll_structs):
                 fh.write('\n')
             fh.write('\n')
 
-numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+");
+numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
+urlRegex = re.compile("((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)")
+
 def normalize(word):
-    return 'NUM' if numberRegex.match(word) else word.lower()
+    return 'NUM' if numberRegex.match(word) else ('<url>' if urlRegex.match(word) else word.lower())
 
 def get_batches(buckets, model, is_train):
     d_copy = [buckets[i][:] for i in range(len(buckets))]
