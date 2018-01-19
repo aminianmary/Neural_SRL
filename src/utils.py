@@ -53,7 +53,7 @@ def vocab(sentences, min_count=2):
             for pred in node.predicateList.values():
                 if pred!='?':
                     semRelCount.update([pred])
-            for c in list(node.form):
+            for c in list(node.norm):
                     chars.add(c.lower())
 
     words = set()
@@ -105,7 +105,7 @@ numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
 urlRegex = re.compile("((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)")
 
 def normalize(word):
-    return 'NUM' if numberRegex.match(word) else ('<url>' if urlRegex.match(word) else word.lower())
+    return '<NUM>' if numberRegex.match(word) else ('<URL>' if urlRegex.match(word) else word.lower())
 
 def get_batches(buckets, model, is_train):
     d_copy = [buckets[i][:] for i in range(len(buckets))]
