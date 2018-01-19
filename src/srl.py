@@ -81,7 +81,7 @@ class SRLLSTM:
         words, pwords, pos, chars, roles, masks = minibatch
         bilstms = self.rnn(words, pwords, pos, chars)
         bilstms_ = concatenate_cols(bilstms)
-        output = rectify(affine_transform([self.out_bias.expr(), self.out_layer.expr(), bilstms_]))
+        output = affine_transform([self.out_bias.expr(), self.out_layer.expr(), bilstms_])
         dim_0_1 = output.dim()[0][1] if words.shape[0]!=1 else 1
         output_reshape = reshape(output, (output.dim()[0][0],), dim_0_1 * output.dim()[1])
         return output_reshape

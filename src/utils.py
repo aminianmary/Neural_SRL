@@ -54,7 +54,7 @@ def vocab(sentences, min_count=2):
                 if pred!='?':
                     semRelCount.update([pred])
             for c in list(node.norm):
-                    chars.add(c.lower())
+                chars.add(c.lower())
 
     words = set()
     for w in wordsCount.keys():
