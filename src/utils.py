@@ -162,17 +162,24 @@ def add_to_minibatch(batch, max_char_len, max_w_len, mini_batches, model):
     mini_batches.append((words, pwords, pos, chars, roles, masks))
 
 def evaluate(output, gold):
-    corr =0
-    total =0
+    tp, fp, tn, fn = 0, 0, 0, 0
     gold_sentences = read_conll(gold)
     auto_sentences = read_conll(output)
+
     for g_s, a_s in zip (gold_sentences, auto_sentences):
         g_predicates = g_s.predicates
         a_predicates = a_s.predicates
-        total+= len(a_predicates)
+
         for a_p in a_predicates:
             if a_p in g_predicates:
-              corr+=1
-    acc = float (corr)/total if total!=0 else 0.0
-    return acc
+                tp+=1
+            else:
+                fp+=1
+        for g_p in g_predicates:
+            if not g_p in a_predicates:
+                fn+=1
+    precision = float (tp)/(tp+fp) if tp+fp!=0 else 0.0
+    recall = float (tp)/(tp+fn) if tp+fn!=0 else 0.0
+    f_score = 2*(precision*recall)/(precision+recall) if precision+recall!=0 else 0
+    return f_score
 
