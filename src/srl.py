@@ -116,13 +116,12 @@ class SRLLSTM:
         best_part = 0
 
         for b, mini_batch in enumerate(mini_batches):
-            output  = self.buildGraph(mini_batch)
+            output = self.buildGraph(mini_batch)
             words, pwords, pos, chars, roles, masks = mini_batch
             num_roles = roles.shape[0] * roles.shape[1]
-            roles = np.reshape(roles, num_roles)
-            masksTensor = reshape(inputTensor(np.reshape(masks, masks.shape[0] * masks.shape[1]).T), (1,),
-                                  masks.shape[0] * masks.shape[1])
-            sm_loss = pickneglogsoftmax_batch(output, roles)
+            roles_vec = np.reshape(roles.T, num_roles)
+            masksTensor = reshape(inputTensor(np.reshape(masks.T, num_roles)), (1,), num_roles)
+            sm_loss = pickneglogsoftmax_batch(output, roles_vec)
             masked_loss = cmult(sm_loss, masksTensor)
             loss_value = sum_batches(masked_loss)/num_roles
             loss_value.forward()
