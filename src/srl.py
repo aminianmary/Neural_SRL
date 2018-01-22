@@ -95,8 +95,8 @@ class SRLLSTM:
             num_sens, num_words = mask.shape[1], mask.shape[0]
             batch_output = [list() for _ in range(num_sens)]
             offset = 0
-            for word_index in range(num_words):
-                for sen_index in range(num_sens):
+            for sen_index in range(num_sens):
+                for word_index in range(num_words):
                     if mask[word_index][sen_index] != 0:
                         batch_output[sen_index].append(argmax_vals[offset])
                     offset += 1
@@ -140,13 +140,13 @@ class SRLLSTM:
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
                                 self.Predict(dev_path))
-                    acc = evaluate(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',dev_path)
+                    precision,recall,fscore = evaluate(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',dev_path)
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
-                    print 'epoch: ' + str(epoch) + ' part: '+ str(part) + '--Accuracy: ' + str(acc)
+                    print 'epoch: ' + str(epoch) + ' part: '+ str(part) + '--precision: ' + str(precision)+' recall: '+str(recall)+' fscore: '+str(fscore)
 
-                    if float(acc) > best_acc:
+                    if float(fscore) > best_acc:
                         self.Save(os.path.join(options.outdir, options.model))
-                        best_acc = float(acc)
+                        best_acc = float(fscore)
                         best_part = part
 
         print 'best part on this epoch: '+ str(best_part)
