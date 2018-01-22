@@ -89,7 +89,6 @@ class SRLLSTM:
     def decode(self, minibatches):
         outputs = []
         for b, batch in enumerate(minibatches):
-            print 'batch '+ str(b)
             output = self.buildGraph(batch).npvalue().T
             argmax_vals = [np.argmax(o) for o in output]
             mask = batch[-1]
