@@ -3,12 +3,20 @@ import re, codecs, random
 import numpy as np
 
 class ConllStruct:
-    def __init__(self, entries, predicates):
+    def __init__(self, entries):
         self.entries = entries
-        self.predicates = predicates
 
     def __len__(self):
         return len(self.entries)
+
+    def get_predicates(self):
+        predicates =[]
+        for e in self.entries:
+            if e.is_pred:
+                predicates.append(e.id)
+        return predicates
+
+
 
 class ConllEntry:
     def __init__(self, id, form, lemma, pos, sense='_', parent_id=-1, relation='_', predicateList=dict(),
@@ -31,8 +39,6 @@ class ConllEntry:
                       str(self.parent_id), self.relation, self.relation,
                       'Y' if self.is_pred else '_',
                       self.sense if self.is_pred else '_']
-        for p in self.predicateList.values():
-            entry_list.append(p)
         return '\t'.join(entry_list)
 
 def vocab(sentences, min_count=2):
@@ -72,7 +78,6 @@ def read_conll(fh):
     read = 0
     for sentence in sentences:
         words = []
-        predicates = list()
         entries = sentence.strip().split('\n')
         for entry in entries:
             spl = entry.split('\t')
@@ -80,7 +85,6 @@ def read_conll(fh):
             is_pred = False
             if spl[12] == 'Y':
                 is_pred = True
-                predicates.append(int(spl[0]) - 1)
 
             for i in range(14, len(spl)):
                 predicateList[i - 14] = spl[i]
@@ -89,15 +93,19 @@ def read_conll(fh):
                 ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], int(spl[9]), spl[11], predicateList,
                            is_pred))
         read += 1
-        yield ConllStruct(words, predicates)
+        yield ConllStruct(words)
     print read, 'sentences read.'
 
 def write_conll(fn, conll_structs):
     with codecs.open(fn, 'w') as fh:
         for conll_struct in conll_structs:
+            predicates = conll_struct.get_predicates()
+            args = ['_' for _ in xrange(len(predicates))]
             for i in xrange(len(conll_struct.entries)):
                 entry = conll_struct.entries[i]
                 fh.write(str(entry))
+                if len(predicates)!=0:
+                    fh.write('\t'+'\t'.join(args))
                 fh.write('\n')
             fh.write('\n')
 
@@ -167,8 +175,8 @@ def evaluate(output, gold):
     auto_sentences = read_conll(output)
 
     for g_s, a_s in zip (gold_sentences, auto_sentences):
-        g_predicates = g_s.predicates
-        a_predicates = a_s.predicates
+        g_predicates = g_s.get_predicates()
+        a_predicates = a_s.get_predicates()
 
         for a_p in a_predicates:
             if a_p in g_predicates:
