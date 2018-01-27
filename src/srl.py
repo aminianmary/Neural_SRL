@@ -162,16 +162,10 @@ class SRLLSTM:
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
-        print 'input data read...'
         for d in dev_data:
             dev_buckets[0].append(d)
-        print 'dev buckets are ready!'
         minibatches = get_batches(dev_buckets, self, False)
-        print 'created minibatches...'
-        print 'minibatch size: '+ str(len(minibatches))
-        print 'trying to decode minibatches...'
         outputs = self.decode(minibatches)
-        print 'outputs are returned!'
         results = [self.iroles[np.argmax(outputs[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
