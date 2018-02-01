@@ -15,18 +15,16 @@ class SRLLSTM:
         self.PAD = 1
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
-        self.pred_lemmas = {pl: ind + 3 for ind,pl in enumerate(lemmas)} # unk, pad, no_lemma
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         self.roles = {r: ind for ind, r in enumerate(roles)}
         self.iroles = roles
-        self.chars = {c: i + 2 for i, c in enumerate(chars)}
+        self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
         self.d_pos = options.d_pos
-        self.d_l = options.d_l
+        self.d_cw = options.d_cw
         self.d_h = options.d_h
         self.d_r = options.d_r
-        self.d_prime_l = options.d_prime_l
         self.k = options.k
         self.alpha = options.alpha
         self.external_embedding = None
@@ -47,10 +45,11 @@ class SRLLSTM:
         self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
 
-        self.inp_dim = self.d_w + self.d_l + self.d_pos + (self.edim if self.external_embedding is not None else 0) + (1 if self.region else 0)  # 1 for predicate indicator
+        self.inp_dim = self.d_w + self.d_cw + self.d_pos + (self.edim if self.external_embedding is not None else 0)+ (1 if self.region else 0)  # 1 for predicate indicator
+        self.char_lstm = BiRNNBuilder(1, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
-        self.x_le = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_l))
+        self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
         self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l))
         self.v_r = self.model.add_lookup_parameters((len(self.roles)+2, self.d_r))
@@ -67,9 +66,20 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, pos, lemmas, pred_flags):
-        inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]), lookup_batch(self.pred_flag, pred_flags[i]),
-                            lookup_batch(self.x_pos, pos[i]), lookup_batch(self.x_le, lemmas[i])]) for i in range(len(words))]
+    def rnn(self, words, pwords, pos, pred_flags, chars):
+        cembed = [lookup_batch(self.ce, c) for c in chars]
+        char_fwd, char_bckd = self.char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                              self.char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+        crnn = reshape(concatenate_cols([char_fwd, char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+        cnn_reps = [list() for _ in range(len(words))]
+
+        for i in range(words.shape[0]):
+            cnn_reps[i] = pick_batch(crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
+        inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
+                               lookup_batch(self.pred_flag, pred_flags[i]), lookup_batch(self.x_pos, pos[i]),
+                               cnn_reps[i]]) for i in range(len(words))]
+
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
@@ -78,10 +88,11 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, pos, lemmas, pred_lemmas, plemmas_index, chars, roles,lemmas_flags, masks = minibatch
-        bilstms = self.rnn(words, pwords, pos, lemmas, lemmas_flags)
+        words, pwords, pos, chars, roles, pred_flags, masks = minibatch
+        bilstms = self.rnn(words, pwords, pos, pred_flags, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         roles, masks = roles.T, masks.T
+
         for sen in range(roles.shape[0]):
             u_l, v_p = self.u_l[pred_lemmas[sen]], bilstms[plemmas_index[sen]][sen]
             W = transpose(concatenate_cols(
