@@ -27,8 +27,8 @@ class ConllEntry:
 
     def __str__(self):
         entry_list = [str(self.id+1), self.form, self.lemma, self.lemma, self.pos, self.pos, '_', '_',
-                      str(self.parent_id),
-                      str(self.parent_id), self.relation, self.relation,
+                      self.parent_id,
+                      self.parent_id, self.relation, self.relation,
                       'Y' if self.is_pred == True else '_',
                       self.sense]
         for p in self.predicateList.values():
@@ -86,7 +86,7 @@ def read_conll(fh):
                 predicateList[i - 14] = spl[i]
 
             words.append(
-                ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], int(spl[9]), spl[11], predicateList,
+                ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], spl[9], spl[11], predicateList,
                            is_pred))
         read += 1
         yield ConllStruct(words, predicates)
