@@ -5,7 +5,7 @@ import numpy as np
 
 
 class SRLLSTM:
-    def __init__(self, words, lemmas, pos, roles, chars, options):
+    def __init__(self, words, pWords,  pos, roles, chars, options):
         self.model = Model()
         self.options = options
         self.batch_size = options.batch
@@ -15,6 +15,7 @@ class SRLLSTM:
         self.PAD = 1
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
+        self.pWords = {word: ind + 3 for ind,word in enumerate(pWords)} # unk, pad, no_lemma
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         self.roles = {r: ind for ind, r in enumerate(roles)}
@@ -26,6 +27,7 @@ class SRLLSTM:
         self.d_h = options.d_h
         self.d_r = options.d_r
         self.k = options.k
+        self.d_prime_l= options.d_prime_l
         self.alpha = options.alpha
         self.external_embedding = None
         self.x_pe = None
@@ -51,14 +53,13 @@ class SRLLSTM:
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
-        self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l))
+        self.u_l = self.model.add_lookup_parameters((len(self.pWords) + 3, self.d_prime_l))
         self.v_r = self.model.add_lookup_parameters((len(self.roles)+2, self.d_r))
         self.pred_flag = self.model.add_lookup_parameters((2, 1))
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
         self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l))
-        self.empty_lemma_embed = inputVector([0]*self.d_l)
 
     def Save(self, filename):
         self.model.save(filename)
@@ -88,13 +89,13 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, pos, chars, roles, pred_flags, masks = minibatch
+        words, pwords, pwords_index, pos, chars, roles, pred_flags, masks = minibatch
         bilstms = self.rnn(words, pwords, pos, pred_flags, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         roles, masks = roles.T, masks.T
 
         for sen in range(roles.shape[0]):
-            u_l, v_p = self.u_l[pred_lemmas[sen]], bilstms[plemmas_index[sen]][sen]
+            u_l, v_p = self.u_l[pwords[sen]], bilstms[pwords_index[sen]][sen]
             W = transpose(concatenate_cols(
                 [rectify(self.U.expr() * (concatenate([u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
 

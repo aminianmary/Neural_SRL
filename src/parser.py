@@ -23,6 +23,7 @@ if __name__ == '__main__':
     parser.add_option("--d_c", type="int", dest="d_c", help="character embedding dimension", default=50)
     parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension", default=100)
     parser.add_option("--d_r", type="int", dest="d_r", default=128)
+    parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
     parser.add_option("--k", type="int", dest="k", default=4)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
@@ -47,13 +48,13 @@ if __name__ == '__main__':
         print 'Preparing vocab'
         print options
         train_data = list(utils.read_conll(options.conll_train))
-        words, lemmas, pos, roles, chars = utils.vocab(train_data)
+        words, pWords, pos, roles, chars = utils.vocab(train_data, 0)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
-            pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
+            pickle.dump((words, pWords, pos, roles, chars, options), paramsfp)
         print 'Finished collecting vocab'
 
         print 'Initializing blstm srl:'
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, options)
+        parser = SRLLSTM(words, pWords, pos, roles, chars, options)
         best_f_score = 0.0
 
         max_len = max([len(d) for d in train_data])
