@@ -15,7 +15,6 @@ class SRLLSTM:
         self.PAD = 1
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
-        self.pWords = {word: ind + 3 for ind,word in enumerate(pWords)} # unk, pad, no_lemma
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         self.roles = {r: ind for ind, r in enumerate(roles)}
@@ -53,7 +52,7 @@ class SRLLSTM:
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
-        self.u_l = self.model.add_lookup_parameters((len(self.pWords) + 3, self.d_prime_l))
+        self.u_l_char_lstm = BiRNNBuilder(1, options.d_c, self.d_prime_l, self.model, VanillaLSTMBuilder)
         self.v_r = self.model.add_lookup_parameters((len(self.roles)+2, self.d_r))
         self.pred_flag = self.model.add_lookup_parameters((2, 1))
         self.pred_flag.init_row(0, [0])
@@ -71,11 +70,19 @@ class SRLLSTM:
         cembed = [lookup_batch(self.ce, c) for c in chars]
         char_fwd, char_bckd = self.char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
                               self.char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+        ul_char_fwd, ul_char_bckd = self.u_l_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                              self.u_l_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
         crnn = reshape(concatenate_cols([char_fwd, char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+        ul_crnn = reshape(concatenate_cols([ul_char_fwd, ul_char_bckd]), (self.d_prime_l, words.shape[0] * words.shape[1]))
         cnn_reps = [list() for _ in range(len(words))]
 
         for i in range(words.shape[0]):
             cnn_reps[i] = pick_batch(crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
+        # first dim: word position; second dim: sentence number.
+        ul_cnn_reps = [list() for _ in range(len(words))]
+        for i in range(words.shape[0]):
+            ul_cnn_reps[i] = pick_batch(ul_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
                                lookup_batch(self.pred_flag, pred_flags[i]), lookup_batch(self.x_pos, pos[i]),
@@ -85,17 +92,18 @@ class SRLLSTM:
             f, b = fb.initial_state(), bb.initial_state()
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
-        return inputs
+        return inputs, ul_cnn_reps
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, pwords_index, pos, chars, roles, pred_flags, masks = minibatch
-        bilstms = self.rnn(words, pwords, pos, pred_flags, chars)
+        words, pos, pwords, pos, pred_lemmas_index, chars, roles, pred_flags, masks = minibatch
+        bilstms, ul_cnn_reps = self.rnn(words, pwords, pos, pred_flags, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
+        ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
         roles, masks = roles.T, masks.T
 
         for sen in range(roles.shape[0]):
-            u_l, v_p = self.u_l[pwords[sen]], bilstms[pwords_index[sen]][sen]
+            u_l, v_p = ul_cnn_reps[pred_lemmas_index[sen]][sen], bilstms[pred_lemmas_index[sen]][sen]
             W = transpose(concatenate_cols(
                 [rectify(self.U.expr() * (concatenate([u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
 
@@ -127,7 +135,7 @@ class SRLLSTM:
         errs,loss,iters,sen_num = [],0,0,0
         dev_path = options.conll_dev
 
-        part_size = len(mini_batches)/5
+        part_size = max(len(mini_batches)/5, 1)
         part = 0
         best_part = 0
 
@@ -138,8 +146,6 @@ class SRLLSTM:
             loss += sum_errs.scalar_value()
             sum_errs.backward()
             self.trainer.update()
-            renew_cg()
-            self.x_le.init_row(self.NO_LEMMA, [0]*self.d_l)
             renew_cg()
             print 'loss:', loss/(b+1), 'time:', time.time() - start, 'progress',round(100*float(b+1)/len(mini_batches),2),'%'
             loss, start = 0, time.time()
