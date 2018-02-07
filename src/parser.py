@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_option("--d_r", type="int", dest="d_r", default=128)
     parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
     parser.add_option("--k", type="int", dest="k", default=4)
+    parser.add_option("--char_k", type="int", dest="char_k", default=1)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)

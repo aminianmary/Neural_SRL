@@ -26,6 +26,7 @@ class SRLLSTM:
         self.d_h = options.d_h
         self.d_r = options.d_r
         self.k = options.k
+        self.char_k = options.char_k
         self.d_prime_l= options.d_prime_l
         self.alpha = options.alpha
         self.external_embedding = None
@@ -47,7 +48,7 @@ class SRLLSTM:
         print 'Load external embedding. Vector dimensions', self.edim
 
         self.inp_dim = self.d_w + self.d_cw + self.d_pos + (self.edim if self.external_embedding is not None else 0)+ (1 if self.region else 0)  # 1 for predicate indicator
-        self.char_lstm = BiRNNBuilder(1, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
+        self.char_lstm = BiRNNBuilder(self.char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
