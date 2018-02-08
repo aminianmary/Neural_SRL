@@ -21,12 +21,13 @@ class SRLLSTM:
         self.iroles = roles
         self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
-        self.d_pos = options.d_pos
         self.d_cw = options.d_cw
+        self.d_pw = options.d_pw
         self.d_h = options.d_h
         self.d_r = options.d_r
         self.k = options.k
-        self.char_k = options.char_k
+        self.lem_char_k = options.lem_char_k
+        self.pos_char_k = options.pos_char_k
         self.d_prime_l= options.d_prime_l
         self.alpha = options.alpha
         self.external_embedding = None
@@ -47,12 +48,12 @@ class SRLLSTM:
         self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
 
-        self.inp_dim = self.d_w + self.d_cw + self.d_pos + (self.edim if self.external_embedding is not None else 0)+ (1 if self.region else 0)  # 1 for predicate indicator
-        self.char_lstm = BiRNNBuilder(self.char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
+        self.inp_dim = self.d_w + self.d_cw + self.d_pw + (self.edim if self.external_embedding is not None else 0)+ (1 if self.region else 0)  # 1 for predicate indicator
+        self.lemma_char_lstm = BiRNNBuilder(self.lem_char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
+        self.pos_char_lstm = BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
-        self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
-        self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
+        self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # lemma character embedding
         self.u_l_char_lstm = BiRNNBuilder(1, options.d_c, self.d_prime_l, self.model, VanillaLSTMBuilder)
         self.v_r = self.model.add_lookup_parameters((len(self.roles)+2, self.d_r))
         self.pred_flag = self.model.add_lookup_parameters((2, 1))
@@ -69,25 +70,32 @@ class SRLLSTM:
 
     def rnn(self, words, pwords, pos, pred_flags, chars):
         cembed = [lookup_batch(self.ce, c) for c in chars]
-        char_fwd, char_bckd = self.char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
-                              self.char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+        lem_char_fwd, lem_char_bckd = self.lemma_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                              self.lemma_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+        pos_char_fwd, pos_char_bckd = self.pos_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                              self.pos_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
         ul_char_fwd, ul_char_bckd = self.u_l_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
                               self.u_l_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
-        crnn = reshape(concatenate_cols([char_fwd, char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+        lem_crnn = reshape(concatenate_cols([lem_char_fwd, lem_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+        pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
         ul_crnn = reshape(concatenate_cols([ul_char_fwd, ul_char_bckd]), (self.d_prime_l, words.shape[0] * words.shape[1]))
-        cnn_reps = [list() for _ in range(len(words))]
-
-        for i in range(words.shape[0]):
-            cnn_reps[i] = pick_batch(crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+        lem_cnn_reps = [list() for _ in range(len(words))]
+        ul_cnn_reps = [list() for _ in range(len(words))]
+        pos_cnn_reps = [list() for _ in range(len(words))]
 
         # first dim: word position; second dim: sentence number.
-        ul_cnn_reps = [list() for _ in range(len(words))]
+        for i in range(words.shape[0]):
+            lem_cnn_reps[i] = pick_batch(lem_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
         for i in range(words.shape[0]):
             ul_cnn_reps[i] = pick_batch(ul_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
+        for i in range(words.shape[0]):
+            pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
-                               lookup_batch(self.pred_flag, pred_flags[i]), lookup_batch(self.x_pos, pos[i]),
-                               cnn_reps[i]]) for i in range(len(words))]
+                               lookup_batch(self.pred_flag, pred_flags[i]), pos_cnn_reps[i],
+                               lem_cnn_reps[i]]) for i in range(len(words))]
 
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
