@@ -70,7 +70,8 @@ def vocab(sentences, min_count=2):
 def read_conll(fh):
     sentences = codecs.open(fh, 'r').read().strip().split('\n\n')
     read = 0
-    for sentence in sentences:
+    for i,sentence in enumerate(sentences):
+        print i
         words = []
         predicates = list()
         entries = sentence.strip().split('\n')
