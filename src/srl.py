@@ -77,7 +77,7 @@ class SRLLSTM:
         ul_char_fwd, ul_char_bckd = self.u_l_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
                               self.u_l_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
         lem_crnn = reshape(concatenate_cols([lem_char_fwd, lem_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
-        pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+        pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]), (self.d_pw, words.shape[0] * words.shape[1]))
         ul_crnn = reshape(concatenate_cols([ul_char_fwd, ul_char_bckd]), (self.d_prime_l, words.shape[0] * words.shape[1]))
         lem_cnn_reps = [list() for _ in range(len(words))]
         ul_cnn_reps = [list() for _ in range(len(words))]
