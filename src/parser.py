@@ -27,6 +27,8 @@ if __name__ == '__main__':
     parser.add_option("--k", type="int", dest="k", default=4)
     parser.add_option("--lem_char_k", type="int", dest="lem_char_k", default=1)
     parser.add_option("--pos_char_k", type="int", dest="pos_char_k", default=1)
+    parser.add_option("--dropout_x", type="float", dest="dropout_x", default=0.33)
+    parser.add_option("--dropout_h", type="float", dest="dropout_h", default=0.33)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)
@@ -108,10 +110,11 @@ if __name__ == '__main__':
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
+        dropout_x, dropout_h = options.dropout_x, options.dropout_h
         for dir, subdir, files in os.walk(options.inputdir):
             for f in files:
                 print 'predicting ' + os.path.join(dir, f)
-                pred = list(parser.Predict(os.path.join(dir, f)))
+                pred = list(parser.Predict(os.path.join(dir, f)), dropout_x, dropout_h)
                 utils.write_conll(options.outputdir + '/' + f + '.srl', pred)
         te = time.time()
         print 'Finished predicting test', te - ts
