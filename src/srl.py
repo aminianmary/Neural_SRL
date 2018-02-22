@@ -179,7 +179,7 @@ class SRLLSTM:
                 if dev_path != '':
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, dropout_x, dropout_h))
+                                      self.Predict(dev_path, dropout_x, dropout_h, options.sen_cut))
                     os.system('perl src/utils/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
@@ -197,13 +197,13 @@ class SRLLSTM:
         return best_f_score
 
 
-    def Predict(self, conll_path, dropout_x, dropout_h):
+    def Predict(self, conll_path, dropout_x, dropout_h, sen_cut):
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
         for d in dev_data:
             dev_buckets[0].append(d)
-        minibatches = get_batches(dev_buckets, self, False)
+        minibatches = get_batches(dev_buckets, self, False, sen_cut)
         outputs = self.decode(minibatches, dropout_x, dropout_h)
         results = [self.iroles[np.argmax(outputs[i])] for i in range(len(outputs))]
         offset = 0

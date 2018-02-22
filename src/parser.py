@@ -34,6 +34,7 @@ if __name__ == '__main__':
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)
     parser.add_option("--beta1", type="float", dest="beta1", default=0.9)
     parser.add_option("--eps", type="float", dest="eps", default=0.00000001)
+    parser.add_option("--sen_cut", type="int", dest="sen_cut", default=100)
     parser.add_option("--learning_rate", type="float", dest="learning_rate", default=0.001)
     parser.add_option("--epochs", type="int", dest="epochs", default=30)
     parser.add_option("--outdir", type="string", dest="outdir", default="results")
@@ -71,7 +72,7 @@ if __name__ == '__main__':
         for epoch in xrange(options.epochs):
             print 'Starting epoch', epoch
             print 'best F-score before starting the epoch: ' + str(best_f_score)
-            best_f_score = parser.Train(utils.get_batches(buckets, parser, True), epoch, best_f_score, options)
+            best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 
             '''
@@ -91,6 +92,9 @@ if __name__ == '__main__':
         print 'Best epoch: ' + str(best_epoch)
         '''
 
+    dropout_x, dropout_h = options.dropout_x, options.dropout_h
+    sen_cut = options.sen_cut
+
     if options.input and options.output:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
@@ -98,7 +102,7 @@ if __name__ == '__main__':
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
-        pred = list(parser.Predict(options.input))
+        pred = list(parser.Predict(options.input, dropout_x, dropout_h,sen_cut))
         te = time.time()
         utils.write_conll(options.output, pred)
         print 'Finished predicting test', te - ts
@@ -110,11 +114,10 @@ if __name__ == '__main__':
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
-        dropout_x, dropout_h = options.dropout_x, options.dropout_h
         for dir, subdir, files in os.walk(options.inputdir):
             for f in files:
                 print 'predicting ' + os.path.join(dir, f)
-                pred = list(parser.Predict(os.path.join(dir, f)), dropout_x, dropout_h)
+                pred = list(parser.Predict(os.path.join(dir, f)), dropout_x, dropout_h,sen_cut)
                 utils.write_conll(options.outputdir + '/' + f + '.srl', pred)
         te = time.time()
         print 'Finished predicting test', te - ts
