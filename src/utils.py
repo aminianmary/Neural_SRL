@@ -114,7 +114,7 @@ def get_batches(buckets, model, is_train):
     batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
     for dc in d_copy:
         for d in dc:
-            if (is_train and len(d)<=100) or not is_train:
+            if (is_train and len(d)<=60) or not is_train:
                 for p, predicate in enumerate(d.predicates):
                     batch.append(d.entries)
                     pred_ids.append([p,predicate])
