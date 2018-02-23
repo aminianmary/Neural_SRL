@@ -115,7 +115,7 @@ class SRLLSTM:
         errs,loss,iters,sen_num = [],0,0,0
         dev_path = options.conll_dev
 
-        part_size = len(mini_batches)/5
+        part_size = max(len(mini_batches)/5,1)
         part = 0
         best_part = 0
 
