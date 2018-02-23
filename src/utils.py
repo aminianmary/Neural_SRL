@@ -106,7 +106,7 @@ numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+");
 def normalize(word):
     return 'NUM' if numberRegex.match(word) else word.lower()
 
-def get_batches(buckets, model, is_train):
+def get_batches(buckets, model, is_train, sen_cut):
     d_copy = [buckets[i][:] for i in range(len(buckets))]
     if is_train:
         for dc in d_copy:
@@ -115,7 +115,7 @@ def get_batches(buckets, model, is_train):
     batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
     for dc in d_copy:
         for d in dc:
-            if (is_train and len(d)<=100) or not is_train:
+            if (is_train and len(d)<=sen_cut) or not is_train:
                 for p, predicate in enumerate(d.predicates):
                     batch.append(d.entries)
                     pred_ids.append([p,predicate])
