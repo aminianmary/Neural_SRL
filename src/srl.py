@@ -22,12 +22,13 @@ class SRLLSTM:
         self.iroles = roles
         self.chars = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
-        self.d_pos = options.d_pos
+        self.d_pw = options.d_pw
         self.d_l = options.d_l
         self.d_h = options.d_h
         self.d_r = options.d_r
         self.d_prime_l = options.d_prime_l
         self.k = options.k
+        self.pos_char_k = options.pos_char_k
         self.alpha = options.alpha
         self.external_embedding = None
         self.x_pe = None
@@ -46,12 +47,12 @@ class SRLLSTM:
         self.x_pe.init_row(1,self.noextrn)
         self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
-
-        self.inp_dim = self.d_w + self.d_l + self.d_pos + (self.edim if self.external_embedding is not None else 0) + (1 if self.region else 0)  # 1 for predicate indicator
+        self.inp_dim = self.d_w + self.d_l + self.d_pw + (self.edim if self.external_embedding is not None else 0) + (1 if self.region else 0)  # 1 for predicate indicator
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
+        self.pos_char_lstm = BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder)
+        self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c))  # pos character embedding
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.x_le = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_l))
-        self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
         self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l))
         self.v_r = self.model.add_lookup_parameters((len(self.roles)+2, self.d_r))
         self.pred_flag = self.model.add_lookup_parameters((2, 1))
@@ -67,9 +68,26 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, pos, lemmas, pred_flags):
-        inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]), lookup_batch(self.pred_flag, pred_flags[i]),
-                            lookup_batch(self.x_pos, pos[i]), lookup_batch(self.x_le, lemmas[i])]) for i in range(len(words))]
+    def rnn(self, words, pwords, pos, lemmas, pred_flags, chars):
+        cembed = [lookup_batch(self.ce, c) for c in chars]
+        pos_char_fwd, pos_char_bckd = self.pos_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                                      self.pos_char_lstm.builder_layers[0][1].initial_state().transduce(
+                                          reversed(cembed))[-1]
+        pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]),
+                           (self.d_pw, words.shape[0] * words.shape[1]))
+        pos_cnn_reps = [list() for _ in range(len(words))]
+
+        # first dim: word position; second dim: sentence number.
+        for i in range(words.shape[0]):
+            pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
+        inputs = [concatenate([lookup_batch(self.x_re, words[i]),
+                               lookup_batch(self.x_pe, pwords[i]),
+                               lookup_batch(self.pred_flag, pred_flags[i]),
+                               pos_cnn_reps[i],
+                               lookup_batch(self.x_le, lemmas[i])])
+                  for i in range(len(words))]
+
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
@@ -79,7 +97,7 @@ class SRLLSTM:
     def buildGraph(self, minibatch, is_train):
         outputs = []
         words, pwords, pos, lemmas, pred_lemmas, plemmas_index, chars, roles,lemmas_flags, masks = minibatch
-        bilstms = self.rnn(words, pwords, pos, lemmas, lemmas_flags)
+        bilstms = self.rnn(words, pwords, pos, lemmas, lemmas_flags, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         roles, masks = roles.T, masks.T
         for sen in range(roles.shape[0]):
