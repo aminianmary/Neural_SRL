@@ -1,4 +1,3 @@
-import dynet as dy
 from dynet import *
 from utils import read_conll, get_batches, get_scores, write_conll
 import time, random, os,math
@@ -26,8 +25,6 @@ class SRLLSTM:
         self.d_pw = options.d_pw
         self.d_h = options.d_h
         self.d_r = options.d_r
-        self.dropout_x = options.dropout_x
-        self.dropout_h = options.dropout_h
         self.k = options.k
         self.lem_char_k = options.lem_char_k
         self.pos_char_k = options.pos_char_k
@@ -71,8 +68,7 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, pred_flags, chars, is_train, dropout_x=0., dropout_h=0.):
-        batch_size = words.shape[1]
+    def rnn(self, words, pwords, pos, pred_flags, chars):
         cembed = [lookup_batch(self.ce, c) for c in chars]
         lem_char_fwd, lem_char_bckd = self.lemma_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
                               self.lemma_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
@@ -100,23 +96,17 @@ class SRLLSTM:
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
                                lookup_batch(self.pred_flag, pred_flags[i]), pos_cnn_reps[i],
                                lem_cnn_reps[i]]) for i in range(len(words))]
-        if is_train:
-            inputs = [dy.dropout(e, 0.33) for e in inputs]
 
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
-            if is_train:
-                fb.set_dropouts(dropout_x, dropout_h)
-                bb.set_dropouts(dropout_x, dropout_h)
-            if batch_size is not None:
-                fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
-                inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
+            fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
+            inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
         return inputs, ul_cnn_reps
 
-    def buildGraph(self, minibatch, is_train, dropout_x, dropout_h):
+    def buildGraph(self, minibatch, is_train):
         outputs = []
         words, pos, pwords, pos, pred_lemmas_index, chars, roles, pred_flags, masks = minibatch
-        bilstms, ul_cnn_reps = self.rnn(words, pwords, pred_flags, chars, is_train, dropout_x, dropout_h)
+        bilstms, ul_cnn_reps = self.rnn(words, pwords, pos, pred_flags, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
         roles, masks = roles.T, masks.T
@@ -138,11 +128,11 @@ class SRLLSTM:
                         outputs.append(scores)
         return outputs
 
-    def decode(self, minibatches, dropout_x, dropout_h):
+    def decode(self, minibatches):
         outputs = [list() for _ in range(len(minibatches))]
         for b, batch in enumerate(minibatches):
             print 'batch '+ str(b)
-            outputs[b] = concatenate_cols(self.buildGraph(batch, False, dropout_x, dropout_h)).npvalue()
+            outputs[b] = concatenate_cols(self.buildGraph(batch, False)).npvalue()
             renew_cg()
         print 'decoded all the batches! YAY!'
         outputs = np.concatenate(outputs, axis=1)
@@ -157,11 +147,9 @@ class SRLLSTM:
         part_size = max(len(mini_batches)/5, 1)
         part = 0
         best_part = 0
-        dropout_x = self.dropout_x
-        dropout_h = self.dropout_h
 
         for b, mini_batch in enumerate(mini_batches):
-            e = self.buildGraph(mini_batch, True, dropout_x, dropout_h)
+            e = self.buildGraph(mini_batch, True)
             errs+= e
             sum_errs = esum(errs)/len(errs)
             loss += sum_errs.scalar_value()
@@ -179,7 +167,7 @@ class SRLLSTM:
                 if dev_path != '':
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, dropout_x, dropout_h, options.sen_cut))
+                                      self.Predict(dev_path, options.sen_cut))
                     os.system('perl src/utils/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
@@ -196,15 +184,14 @@ class SRLLSTM:
         print 'best part on this epoch: '+ str(best_part)
         return best_f_score
 
-
-    def Predict(self, conll_path, dropout_x, dropout_h, sen_cut):
+    def Predict(self, conll_path, sen_cut):
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
         for d in dev_data:
             dev_buckets[0].append(d)
         minibatches = get_batches(dev_buckets, self, False, sen_cut)
-        outputs = self.decode(minibatches, dropout_x, dropout_h)
+        outputs = self.decode(minibatches)
         results = [self.iroles[np.argmax(outputs[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
