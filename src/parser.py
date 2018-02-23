@@ -89,8 +89,6 @@ if __name__ == '__main__':
 
         print 'Best epoch: ' + str(best_epoch)
         '''
-
-    dropout_x, dropout_h = options.dropout_x, options.dropout_h
     sen_cut = options.sen_cut
 
     if options.input and options.output:
@@ -100,7 +98,7 @@ if __name__ == '__main__':
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
-        pred = list(parser.Predict(options.input, dropout_x, dropout_h,sen_cut))
+        pred = list(parser.Predict(options.input, sen_cut))
         te = time.time()
         utils.write_conll(options.output, pred)
         print 'Finished predicting test', te - ts
