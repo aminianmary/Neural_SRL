@@ -15,9 +15,9 @@ class ConllEntry:
                  is_pred=False):
         self.id = id
         self.form = form
-        self.lemma = lemma
+        self.lemma = lemma[0:50]
         self.norm = normalize(form)
-        self.lemmaNorm = normalize(lemma)
+        self.lemmaNorm = normalize(lemma)[0:50]
         self.pos = pos.upper()
         self.parent_id = parent_id
         self.relation = relation
