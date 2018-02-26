@@ -23,7 +23,6 @@ if __name__ == '__main__':
     parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension for lemma", default=100)
     parser.add_option("--d_pw", type="int", dest="d_pw", help="character lstm dimension for pos", default=100)
     parser.add_option("--d_r", type="int", dest="d_r", default=128)
-    parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
     parser.add_option("--k", type="int", dest="k", default=4)
     parser.add_option("--lem_char_k", type="int", dest="lem_char_k", default=1)
     parser.add_option("--pos_char_k", type="int", dest="pos_char_k", default=1)
@@ -73,22 +72,6 @@ if __name__ == '__main__':
             best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 
-            '''
-            if options.conll_dev != '':
-                start = time.time()
-                utils.write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + '.txt',
-                                  parser.Predict(options.conll_dev))
-                os.system('perl src/utils/eval.pl -g ' + options.conll_dev + ' -s ' + os.path.join(options.outdir,options.model) + str(epoch + 1) + '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + '.eval')
-                print 'Finished predicting dev; time:', time.time() - start
-                labeled_f, unlabeled_f = utils.get_scores(os.path.join(options.outdir, options.model) + str(epoch + 1) + '.eval')
-                print 'epoch: ' + str(epoch) + '-- labeled F1: ' + str(labeled_f) + ' Unlabaled F: ' + str(unlabeled_f)
-                if float(labeled_f) > best_f_score:
-                    parser.Save(os.path.join(options.outdir, options.model))
-                    best_f_score = float(labeled_f)
-                    best_epoch = epoch
-
-        print 'Best epoch: ' + str(best_epoch)
-        '''
     sen_cut = options.sen_cut
 
     if options.input and options.output:

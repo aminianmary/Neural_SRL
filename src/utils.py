@@ -11,8 +11,7 @@ class ConllStruct:
         return len(self.entries)
 
 class ConllEntry:
-    def __init__(self, id, form, lemma, pos, sense='_', parent_id=-1, relation='_', predicateList=dict(),
-                 is_pred=False):
+    def __init__(self, id, form, lemma, pos, sense='_', parent_id=-1, relation='_', is_pred=False):
         self.id = id
         self.form = form[0:50]
         self.lemma = lemma
@@ -21,7 +20,6 @@ class ConllEntry:
         self.pos = pos.upper()
         self.parent_id = parent_id
         self.relation = relation
-        self.predicateList = predicateList
         self.sense = sense
         self.is_pred = is_pred
 
@@ -31,14 +29,14 @@ class ConllEntry:
                       self.parent_id, self.relation, self.relation,
                       'Y' if self.is_pred == True else '_',
                       self.sense]
-        for p in self.predicateList.values():
+        for p in self.arg_list.values():
             entry_list.append(p)
         return '\t'.join(entry_list)
 
 def vocab(sentences, min_count=2):
     wordsCount = Counter()
     posCount = Counter()
-    semRelCount = Counter()
+    psenseCount = Counter()
     pWordCount = Counter()
     chars = set()
 
@@ -50,9 +48,7 @@ def vocab(sentences, min_count=2):
                 continue
             if node.is_pred:
                 pWordCount.update([node.norm])
-            for pred in node.predicateList.values():
-                if pred!='?':
-                    semRelCount.update([pred])
+                psenseCount.update([node.sense])
             for c in list(node.form):
                     chars.add(c.lower())
 
@@ -65,7 +61,7 @@ def vocab(sentences, min_count=2):
         if pWordCount[l] >= min_count:
             pWords.add(l)
     return (list(words), list(pWords),
-            list(posCount), list(semRelCount.keys()), list(chars))
+            list(posCount), list(psenseCount.keys()), list(chars))
 
 def read_conll(fh):
     sentences = codecs.open(fh, 'r').read().strip().split('\n\n')
@@ -101,9 +97,11 @@ def write_conll(fn, conll_structs):
                 fh.write('\n')
             fh.write('\n')
 
-numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+");
+numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
+urlRegex = re.compile("((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)")
+
 def normalize(word):
-    return 'NUM' if numberRegex.match(word) else word.lower()
+    return '<NUM>' if numberRegex.match(word) else ('<URL>' if urlRegex.match(word) else word.lower())
 
 def get_batches(buckets, model, is_train, sen_cut):
     d_copy = [buckets[i][:] for i in range(len(buckets))]
@@ -145,7 +143,7 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
     pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0) if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     roles = np.array([np.array(
-        [model.roles.get(batch[i][j].predicateList[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD for i in
+        [model.roles.get(batch[i][j].psense_list[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD for i in
          range(len(batch))]) for j in range(cur_len)])
     chars = np.array([[[model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 < j < len(batch[i]) and c < len(
         batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(len(batch))] for j in range(cur_len)] for
