@@ -14,9 +14,9 @@ class ConllEntry:
     def __init__(self, id, form, lemma, pos, sense='_', parent_id=-1, relation='_', predicateList=dict(),
                  is_pred=False):
         self.id = id
-        self.form = form
+        self.form = form[0:50]
         self.lemma = lemma
-        self.norm = normalize(form)
+        self.norm = normalize(form)[0:50]
         self.lemmaNorm = normalize(lemma)
         self.pos = pos.upper()
         self.parent_id = parent_id
