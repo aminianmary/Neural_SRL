@@ -44,8 +44,6 @@ def vocab(sentences, min_count=2):
         wordsCount.update([node.norm for node in sentence.entries])
         posCount.update([node.pos for node in sentence.entries])
         for node in sentence.entries:
-            if node.predicateList == None:
-                continue
             if node.is_pred:
                 pWordCount.update([node.norm])
                 psenseCount.update([node.sense])
@@ -72,18 +70,13 @@ def read_conll(fh):
         entries = sentence.strip().split('\n')
         for entry in entries:
             spl = entry.split('\t')
-            predicateList = dict()
             is_pred = False
             if spl[12] == 'Y':
                 is_pred = True
                 predicates.append(int(spl[0]) - 1)
 
-            for i in range(14, len(spl)):
-                predicateList[i - 14] = spl[i]
-
             words.append(
-                ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], spl[9], spl[11], predicateList,
-                           is_pred))
+                ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], spl[9], spl[11], is_pred))
         read += 1
         yield ConllStruct(words, predicates)
     print read, 'sentences read.'
@@ -142,15 +135,15 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
          range(len(batch))]) for j in range(cur_len)])
     pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0) if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
-    roles = np.array([np.array(
-        [model.roles.get(batch[i][j].psense_list[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD for i in
+    senses = np.array([np.array(
+        [model.senses.get(batch[i][j].sense, 0) if j < len(batch[i]) else model.PAD for i in
          range(len(batch))]) for j in range(cur_len)])
     chars = np.array([[[model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 < j < len(batch[i]) and c < len(
         batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(len(batch))] for j in range(cur_len)] for
                       c in range(cur_c_len)])
     chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
-    masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pos, pwords, pos, pred_lemmas_index, chars, roles, pred_flags, masks))
+    masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].sense !='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
+    mini_batches.append((words, pos, pwords, pos, pred_lemmas_index, chars, senses, pred_flags, masks))
 
 
 def get_scores(fp):
