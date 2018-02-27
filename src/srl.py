@@ -17,6 +17,7 @@ class SRLLSTM:
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
+        senses = ['<UNK>'] + senses
         self.senses = {s: ind for ind, s in enumerate(senses)}
         self.isenses = senses
         self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
@@ -53,7 +54,8 @@ class SRLLSTM:
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # lemma character embedding
-        self.W = self.model.add_parameters((self.d_r, self.d_h * 2 ))
+        self.W = self.model.add_parameters((len(self.isenses), self.d_h * 2))
+        self.b = self.model.add_parameters((len(self.isenses)))
 
     def Save(self, filename):
         self.model.save(filename)
