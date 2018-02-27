@@ -92,30 +92,30 @@ class SRLLSTM:
         return inputs
 
     def buildGraph(self, minibatch, is_train):
-        outputs = []
         words, pos, pwords, pos, pred_lemmas_index, chars, senses, masks = minibatch
         bilstms = self.rnn(words, pwords, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         senses, masks = senses.T, masks.T
 
-        #forming the output layer
-        for sen in range(senses.shape[0]):
-            v_p = bilstms[pred_lemmas_index[sen]][sen]
-            scores = affine_transform([self.b.expr(), self.W.expr(), v_p])
-            if is_train:
-                gold_sense = senses[sen][pred_lemmas_index[sen]]
-                err = pickneglogsoftmax(scores, gold_sense)
-                outputs.append(err)
-            else:
-                outputs.append(scores)
+        v_p = [bilstms[pred_lemmas_index[sen]][sen] for sen in range(senses.shape[0])]
+        bv_p = concatenate_to_batch(v_p)
+        scores = affine_transform([self.b.expr(), self.W.expr(), bv_p])
+        if is_train:
+            gold_senses = [senses[sen][pred_lemmas_index[sen]] for sen in range(senses.shape[0])]
+            err = pickneglogsoftmax_batch(scores, gold_senses)
+            output = sum_batches(err) / err.dim()[1]
+        else:
+            output = scores
 
-        return outputs
+        return output
 
     def decode(self, minibatches):
         outputs = [list() for _ in range(len(minibatches))]
         for b, batch in enumerate(minibatches):
             print 'batch '+ str(b)
-            outputs[b] = concatenate_cols(self.buildGraph(batch, False)).npvalue()
+            outputs[b] = self.buildGraph(batch, False).npvalue()
+            if len(outputs[b].shape) == 1:
+                outputs[b] = np.reshape(outputs[b], (outputs[b].shape[0], 1))
             renew_cg()
         print 'decoded all the batches! YAY!'
         outputs = np.concatenate(outputs, axis=1)
@@ -124,7 +124,7 @@ class SRLLSTM:
     def Train(self, mini_batches, epoch, best_f_score, options):
         print 'Start time', time.ctime()
         start = time.time()
-        errs,loss,iters,sen_num = [],0,0,0
+        iters = 0
         dev_path = options.conll_dev
 
         part_size = max(len(mini_batches)/5, 1)
@@ -132,16 +132,13 @@ class SRLLSTM:
         best_part = 0
 
         for b, mini_batch in enumerate(mini_batches):
-            e = self.buildGraph(mini_batch, True)
-            errs+= e
-            sum_errs = esum(errs)/len(errs)
-            loss += sum_errs.scalar_value()
+            sum_errs = self.buildGraph(mini_batch, True)
+            loss = sum_errs.scalar_value()
             sum_errs.backward()
             self.trainer.update()
             renew_cg()
             print 'loss:', loss/(b+1), 'time:', time.time() - start, 'progress',round(100*float(b+1)/len(mini_batches),2),'%'
-            loss, start = 0, time.time()
-            errs, sen_num = [], 0
+            start = time.time()
             iters+=1
 
             if (b+1)%part_size==0:
