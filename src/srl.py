@@ -55,7 +55,7 @@ class SRLLSTM:
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # lemma character embedding
         self.W = self.model.add_parameters((len(self.isenses), self.d_h * 2))
-        self.b = self.model.add_parameters((len(self.isenses)))
+        self.b = self.model.add_parameters((len(self.isenses)), init = ConstInitializer(0))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -103,7 +103,7 @@ class SRLLSTM:
             v_p =bilstms[pred_lemmas_index[sen]][sen]
             for pred_index in range(pred_lemmas_index[sen]):
                 if masks[sen][pred_index] != 0:
-                    scores = self.W.expr() * v_p
+                    scores = affine_transform([self.b.expr(), self.W.expr(), v_p])
                     if is_train:
                         gold_sense = senses[sen][pred_index]
                         err = pickneglogsoftmax(scores, gold_sense) * masks[sen][pred_index]
