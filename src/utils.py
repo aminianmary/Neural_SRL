@@ -142,7 +142,7 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
          range(len(batch))]) for j in range(cur_len)])
     pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     senses = np.array([np.array(
-        [model.senses.get(batch[i][j].sense, 0) if j < len(batch[i]) else model.PAD for i in
+        [model.senses.get(batch[i][j].sense, 0) if j < len(batch[i]) else 0 for i in
          range(len(batch))]) for j in range(cur_len)])
     chars = np.array([[[model.char_dict.get(batch[i][j].form[c].lower(), 0) if 0 < j < len(batch[i]) and c < len(
         batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(len(batch))] for j in range(cur_len)] for
@@ -166,3 +166,21 @@ def get_scores(fp):
                 spl = line.strip().split(' ')
                 unlabeled_f = spl[len(spl) - 1]
     return (labeled_f, unlabeled_f)
+
+
+def eval_sense(gold_file, predicted_file):
+    r1 = codecs.open(gold_file, 'r')
+    r2 = codecs.open(predicted_file, 'r')
+    l1 = r1.readline()
+    c, a_ = 0, 0
+    while l1:
+        l2 = r2.readline().strip()
+        spl = l1.strip().split('\t')
+        if len(spl) > 8:
+            g_s, p_s = spl[13], l2.split('\t')[13]
+            if g_s != '_':
+                a_ += 1
+                if g_s == p_s:
+                    c += 1
+        l1 = r1.readline()
+    return round(100.0 * float(c)/a_ ,2)

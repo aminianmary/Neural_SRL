@@ -1,5 +1,5 @@
 from dynet import *
-from utils import read_conll, get_batches, get_scores, write_conll
+from utils import read_conll, get_batches, get_scores, write_conll, eval_sense
 import time, random, os,math
 import numpy as np
 
@@ -100,16 +100,15 @@ class SRLLSTM:
 
         #forming the output layer
         for sen in range(senses.shape[0]):
-            v_p =bilstms[pred_lemmas_index[sen]][sen]
-            for pred_index in range(pred_lemmas_index[sen]):
-                if masks[sen][pred_index] != 0:
-                    scores = affine_transform([self.b.expr(), self.W.expr(), v_p])
-                    if is_train:
-                        gold_sense = senses[sen][pred_index]
-                        err = pickneglogsoftmax(scores, gold_sense) * masks[sen][pred_index]
-                        outputs.append(err)
-                    else:
-                        outputs.append(scores)
+            v_p = bilstms[pred_lemmas_index[sen]][sen]
+            scores = affine_transform([self.b.expr(), self.W.expr(), v_p])
+            if is_train:
+                gold_sense = senses[sen][pred_lemmas_index[sen]]
+                err = pickneglogsoftmax(scores, gold_sense)
+                outputs.append(err)
+            else:
+                outputs.append(scores)
+
         return outputs
 
     def decode(self, minibatches):
@@ -152,17 +151,11 @@ class SRLLSTM:
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
                                       self.Predict(dev_path, options.sen_cut))
-                    os.system('perl src/utils/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
-                    print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
+                    accuracy = eval_sense(dev_path, os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt')
 
-                    labeled_f, unlabeled_f = get_scores(
-                        os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
-                    print 'epoch: ' + str(epoch) + ' part: '+ str(part) + '-- labeled F1: ' + str(labeled_f) + ' Unlabaled F: ' + str(
-                        unlabeled_f)
-
-                    if float(labeled_f) > best_f_score:
+                    if float(accuracy) > best_f_score:
                         self.Save(os.path.join(options.outdir, options.model))
-                        best_f_score = float(labeled_f)
+                        best_f_score = accuracy
                         best_part = part
 
         print 'best part on this epoch: '+ str(best_part)
@@ -179,7 +172,7 @@ class SRLLSTM:
         results = [self.isenses[np.argmax(outputs[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
-            for p in xrange(len(sentence.predicates)):
+            for p in sentence.predicates:
                 sentence.entries[p].sense = results[offset]
                 offset+=1
             yield sentence
