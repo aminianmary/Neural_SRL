@@ -11,7 +11,8 @@ class ConllStruct:
         return len(self.entries)
 
 class ConllEntry:
-    def __init__(self, id, form, lemma, pos, sense='_', parent_id=-1, relation='_', is_pred=False):
+    def __init__(self, id, form, lemma, pos, sense='_', parent_id=-1, relation='_',  arg_list=dict(),
+                 is_pred=False):
         self.id = id
         self.form = form[0:50]
         self.lemma = lemma
@@ -19,6 +20,7 @@ class ConllEntry:
         self.lemmaNorm = normalize(lemma)
         self.pos = pos.upper()
         self.parent_id = parent_id
+        self.arg_list= arg_list
         self.relation = relation
         self.sense = sense
         self.is_pred = is_pred
@@ -70,13 +72,18 @@ def read_conll(fh):
         entries = sentence.strip().split('\n')
         for entry in entries:
             spl = entry.split('\t')
+            arg_list = dict()
             is_pred = False
             if spl[12] == 'Y':
                 is_pred = True
                 predicates.append(int(spl[0]) - 1)
 
+            for i in range(14, len(spl)):
+                arg_list[i - 14] = spl[i]
+
             words.append(
-                ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], spl[9], spl[11], is_pred))
+                ConllEntry(int(spl[0]) - 1, spl[1], spl[3], spl[5], spl[13], spl[9], spl[11], arg_list,
+                           is_pred))
         read += 1
         yield ConllStruct(words, predicates)
     print read, 'sentences read.'
@@ -133,7 +140,6 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
     pos = np.array([np.array(
         [model.pos.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD for i in
          range(len(batch))]) for j in range(cur_len)])
-    pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0) if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     senses = np.array([np.array(
         [model.senses.get(batch[i][j].sense, 0) if j < len(batch[i]) else model.PAD for i in
@@ -143,7 +149,7 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
                       c in range(cur_c_len)])
     chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
     masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].sense !='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pos, pwords, pos, pred_lemmas_index, chars, senses, pred_flags, masks))
+    mini_batches.append((words, pos, pwords, pos, pred_lemmas_index, chars, senses, masks))
 
 
 def get_scores(fp):

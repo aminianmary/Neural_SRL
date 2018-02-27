@@ -53,11 +53,7 @@ class SRLLSTM:
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # lemma character embedding
-        self.pred_flag = self.model.add_lookup_parameters((2, 1))
-        self.pred_flag.init_row(0, [0])
-        self.pred_flag.init_row(0, [1])
-        self.pred_flag.set_updated(False)
-        self.W = self.model.add_parameters((self.d_h * 2, self.d_r ))
+        self.W = self.model.add_parameters((self.d_r, self.d_h * 2 ))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -65,7 +61,7 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, pos, pred_flags, chars):
+    def rnn(self, words, pwords, chars):
         cembed = [lookup_batch(self.ce, c) for c in chars]
         lem_char_fwd, lem_char_bckd = self.lemma_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
                               self.lemma_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
@@ -84,7 +80,7 @@ class SRLLSTM:
             pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
-                               lookup_batch(self.pred_flag, pred_flags[i]), pos_cnn_reps[i],
+                                pos_cnn_reps[i],
                                lem_cnn_reps[i]]) for i in range(len(words))]
 
         for fb, bb in self.deep_lstms.builder_layers:
@@ -95,8 +91,8 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pos, pwords, pos, pred_lemmas_index, chars, senses, pred_flags, masks = minibatch
-        bilstms = self.rnn(words, pwords, pos, pred_flags, chars)
+        words, pos, pwords, pos, pred_lemmas_index, chars, senses, masks = minibatch
+        bilstms = self.rnn(words, pwords, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         senses, masks = senses.T, masks.T
 
@@ -105,7 +101,7 @@ class SRLLSTM:
             v_p =bilstms[pred_lemmas_index[sen]][sen]
             for pred_index in range(pred_lemmas_index[sen]):
                 if masks[sen][pred_index] != 0:
-                    scores = self.W * v_p
+                    scores = self.W.expr() * v_p
                     if is_train:
                         gold_sense = senses[sen][pred_index]
                         err = pickneglogsoftmax(scores, gold_sense) * masks[sen][pred_index]
@@ -182,7 +178,6 @@ class SRLLSTM:
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
             for p in xrange(len(sentence.predicates)):
-                for arg_index in xrange(len(sentence.entries)):
-                    sentence.entries[arg_index].predicateList[p] = results[offset]
-                    offset+=1
+                sentence.entries[p].sense = results[offset]
+                offset+=1
             yield sentence
