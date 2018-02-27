@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_option("--lem_char_k", type="int", dest="lem_char_k", default=1)
     parser.add_option("--pos_char_k", type="int", dest="pos_char_k", default=1)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
-    parser.add_option("--dev_batch_size", type="int", dest="batch", default=1000)
+    parser.add_option("--dev_batch_size", type="int", dest="dev_batch_size", default=1000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)
     parser.add_option("--beta1", type="float", dest="beta1", default=0.9)
