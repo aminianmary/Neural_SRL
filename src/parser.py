@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_option("--lem_char_k", type="int", dest="lem_char_k", default=1)
     parser.add_option("--pos_char_k", type="int", dest="pos_char_k", default=1)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
+    parser.add_option("--dev_batch_size", type="int", dest="batch", default=1000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)
     parser.add_option("--beta1", type="float", dest="beta1", default=0.9)
@@ -73,22 +74,6 @@ if __name__ == '__main__':
             best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 
-            '''
-            if options.conll_dev != '':
-                start = time.time()
-                utils.write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + '.txt',
-                                  parser.Predict(options.conll_dev))
-                os.system('perl src/utils/eval.pl -g ' + options.conll_dev + ' -s ' + os.path.join(options.outdir,options.model) + str(epoch + 1) + '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + '.eval')
-                print 'Finished predicting dev; time:', time.time() - start
-                labeled_f, unlabeled_f = utils.get_scores(os.path.join(options.outdir, options.model) + str(epoch + 1) + '.eval')
-                print 'epoch: ' + str(epoch) + '-- labeled F1: ' + str(labeled_f) + ' Unlabaled F: ' + str(unlabeled_f)
-                if float(labeled_f) > best_f_score:
-                    parser.Save(os.path.join(options.outdir, options.model))
-                    best_f_score = float(labeled_f)
-                    best_epoch = epoch
-
-        print 'Best epoch: ' + str(best_epoch)
-        '''
     sen_cut = options.sen_cut
 
     if options.input and options.output:
@@ -96,6 +81,7 @@ if __name__ == '__main__':
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser.batch_size = options.dev_batch_size
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         pred = list(parser.Predict(options.input, sen_cut))
@@ -108,6 +94,7 @@ if __name__ == '__main__':
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser.batch_size = options.dev_batch_size
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         for dir, subdir, files in os.walk(options.inputdir):
