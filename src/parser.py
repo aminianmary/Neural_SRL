@@ -27,6 +27,7 @@ if __name__ == '__main__':
     parser.add_option("--k", type="int", dest="k", default=4)
     parser.add_option("--char_k", type="int", dest="char_k", default=1)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
+    parser.add_option("--dev_batch_size", type="int", dest="dev_batch_size", default=1000)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)
     parser.add_option("--beta1", type="float", dest="beta1", default=0.9)
@@ -94,6 +95,7 @@ if __name__ == '__main__':
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser.batch_size= options.dev_batch_size
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         pred = list(parser.Predict(options.input, options.sen_cut))
@@ -106,6 +108,7 @@ if __name__ == '__main__':
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser.batch_size= options.dev_batch_size
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         for dir, subdir, files in os.walk(options.inputdir):
