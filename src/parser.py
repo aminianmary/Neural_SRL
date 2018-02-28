@@ -7,7 +7,7 @@ from optparse import OptionParser
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("--train", dest="conll_train", help="Annotated CONLL train file", metavar="FILE", default=None)
-    parser.add_option("--dev", dest="conll_dev", help="Annotated CONLL dev file", metavar="FILE", default='')
+    parser.add_option("--dev", dest="conll_dev", help="Annotated CONLL dev file", metavar="FILE", default=None)
     parser.add_option("--input", dest="input", help="Annotated CONLL test file", metavar="FILE", default=None)
     parser.add_option("--inputdir", dest="inputdir", help="Directory containing test files", metavar="FILE",
                       default=None)
@@ -73,6 +73,8 @@ if __name__ == '__main__':
             print 'best F-score before starting the epoch: ' + str(best_f_score)
             best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
+        if options.options.conll_dev == None:
+            parser.Save(os.path.join(options.outdir, options.model))
 
     sen_cut = options.sen_cut
 
