@@ -18,21 +18,22 @@ if __name__ == '__main__':
     parser.add_option("--extrn", dest="external_embedding", help="External embeddings", metavar="FILE")
     parser.add_option("--model", dest="model", help="Load/Save model file", metavar="FILE", default="model")
     parser.add_option("--d_w", type="int", dest="d_w", default=100)
-    parser.add_option("--d_l", type="int", dest="d_l", default=100)
     parser.add_option("--d_pos", type="int", dest="d_pos", default=16)
     parser.add_option("--d_h", type="int", dest="d_h", default=512)
+    parser.add_option("--d_c", type="int", dest="d_c", help="character embedding dimension", default=50)
+    parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension", default=100)
     parser.add_option("--d_r", type="int", dest="d_r", default=128)
     parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
     parser.add_option("--k", type="int", dest="k", default=4)
+    parser.add_option("--char_k", type="int", dest="char_k", default=1)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
-    parser.add_option("--dev_batch_size", type="int", dest="dev_batch_size", default=500)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
     parser.add_option("--beta2", type="float", dest="beta2", default=0.999)
     parser.add_option("--beta1", type="float", dest="beta1", default=0.9)
     parser.add_option("--eps", type="float", dest="eps", default=0.00000001)
     parser.add_option("--learning_rate", type="float", dest="learning_rate", default=0.001)
-    parser.add_option("--sen_cut", type="int", dest="sen_cut", default=100)
     parser.add_option("--epochs", type="int", dest="epochs", default=30)
+    parser.add_option("--sen_cut", type="int", dest="sen_cut", default=100)
     parser.add_option("--outdir", type="string", dest="outdir", default="results")
     parser.add_option("--dynet-autobatch", type="int", default=1)
     parser.add_option("--dynet-mem", type="int", default=10240)
@@ -49,13 +50,13 @@ if __name__ == '__main__':
         print 'Preparing vocab'
         print options
         train_data = list(utils.read_conll(options.conll_train))
-        words, lemmas, pos, roles, chars = utils.vocab(train_data)
+        words, pWords, pos, roles, chars = utils.vocab(train_data)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
-            pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
+            pickle.dump((words, pWords, pos, roles, chars, options), paramsfp)
         print 'Finished collecting vocab'
 
         print 'Initializing blstm srl:'
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, options)
+        parser = SRLLSTM(words, pWords, pos, roles, chars, options)
         best_f_score = 0.0
 
         max_len = max([len(d) for d in train_data])
@@ -93,7 +94,6 @@ if __name__ == '__main__':
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
-        parser.batch_size = options.dev_batch_size
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         pred = list(parser.Predict(options.input, options.sen_cut))
@@ -106,7 +106,6 @@ if __name__ == '__main__':
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
-        parser.batch_size = options.dev_batch_size
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         for dir, subdir, files in os.walk(options.inputdir):

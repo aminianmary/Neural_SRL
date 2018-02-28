@@ -5,7 +5,7 @@ import numpy as np
 
 
 class SRLLSTM:
-    def __init__(self, words, lemmas, pos, roles, chars, options):
+    def __init__(self, words, pWords,  pos, roles, chars, options):
         self.model = Model()
         self.options = options
         self.batch_size = options.batch
@@ -15,19 +15,19 @@ class SRLLSTM:
         self.PAD = 1
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
-        self.pred_lemmas = {pl: ind + 3 for ind,pl in enumerate(lemmas)} # unk, pad, no_lemma
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         self.roles = {r: ind for ind, r in enumerate(roles)}
         self.iroles = roles
-        self.chars = {c: i + 2 for i, c in enumerate(chars)}
+        self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
         self.d_pos = options.d_pos
-        self.d_l = options.d_l
+        self.d_cw = options.d_cw
         self.d_h = options.d_h
         self.d_r = options.d_r
-        self.d_prime_l = options.d_prime_l
         self.k = options.k
+        self.char_k = options.char_k
+        self.d_prime_l= options.d_prime_l
         self.alpha = options.alpha
         self.external_embedding = None
         self.x_pe = None
@@ -47,19 +47,19 @@ class SRLLSTM:
         self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
 
-        self.inp_dim = self.d_w + self.d_l + self.d_pos + (self.edim if self.external_embedding is not None else 0) + (1 if self.region else 0)  # 1 for predicate indicator
+        self.inp_dim = self.d_w + self.d_cw + self.d_pos + (self.edim if self.external_embedding is not None else 0)+ (1 if self.region else 0)  # 1 for predicate indicator
+        self.char_lstm = BiRNNBuilder(self.char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
-        self.x_le = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_l))
+        self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # character embedding
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
-        self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l))
+        self.u_l_char_lstm = BiRNNBuilder(1, options.d_c, self.d_prime_l, self.model, VanillaLSTMBuilder)
         self.v_r = self.model.add_lookup_parameters((len(self.roles)+2, self.d_r))
         self.pred_flag = self.model.add_lookup_parameters((2, 1))
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
         self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l))
-        self.empty_lemma_embed = inputVector([0]*self.d_l)
 
     def Save(self, filename):
         self.model.save(filename)
@@ -67,23 +67,44 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, pos, lemmas, pred_flags):
-        inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]), lookup_batch(self.pred_flag, pred_flags[i]),
-                            lookup_batch(self.x_pos, pos[i]), lookup_batch(self.x_le, lemmas[i])]) for i in range(len(words))]
+    def rnn(self, words, pwords, pos, pred_flags, chars):
+        cembed = [lookup_batch(self.ce, c) for c in chars]
+        char_fwd, char_bckd = self.char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                              self.char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+        ul_char_fwd, ul_char_bckd = self.u_l_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                              self.u_l_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+        crnn = reshape(concatenate_cols([char_fwd, char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+        ul_crnn = reshape(concatenate_cols([ul_char_fwd, ul_char_bckd]), (self.d_prime_l, words.shape[0] * words.shape[1]))
+        cnn_reps = [list() for _ in range(len(words))]
+
+        for i in range(words.shape[0]):
+            cnn_reps[i] = pick_batch(crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
+        # first dim: word position; second dim: sentence number.
+        ul_cnn_reps = [list() for _ in range(len(words))]
+        for i in range(words.shape[0]):
+            ul_cnn_reps[i] = pick_batch(ul_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+
+        inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
+                               lookup_batch(self.pred_flag, pred_flags[i]), lookup_batch(self.x_pos, pos[i]),
+                               cnn_reps[i]]) for i in range(len(words))]
+
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
-        return inputs
+        return inputs, ul_cnn_reps
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, pos, lemmas, pred_lemmas, plemmas_index, chars, roles,lemmas_flags, masks = minibatch
-        bilstms = self.rnn(words, pwords, pos, lemmas, lemmas_flags)
+        words, pos, pwords, pos, pred_lemmas_index, chars, roles, pred_flags, masks = minibatch
+        bilstms, ul_cnn_reps = self.rnn(words, pwords, pos, pred_flags, chars)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
+        ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
         roles, masks = roles.T, masks.T
+
         for sen in range(roles.shape[0]):
-            u_l, v_p = self.u_l[pred_lemmas[sen]], bilstms[plemmas_index[sen]][sen]
+            u_l, v_p = ul_cnn_reps[pred_lemmas_index[sen]][sen], bilstms[pred_lemmas_index[sen]][sen]
             W = transpose(concatenate_cols(
                 [rectify(self.U.expr() * (concatenate([u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
 
@@ -115,7 +136,7 @@ class SRLLSTM:
         errs,loss,iters,sen_num = [],0,0,0
         dev_path = options.conll_dev
 
-        part_size = max(len(mini_batches)/5,1)
+        part_size = max(len(mini_batches)/5, 1)
         part = 0
         best_part = 0
 
@@ -126,8 +147,6 @@ class SRLLSTM:
             loss += sum_errs.scalar_value()
             sum_errs.backward()
             self.trainer.update()
-            renew_cg()
-            self.x_le.init_row(self.NO_LEMMA, [0]*self.d_l)
             renew_cg()
             print 'loss:', loss/(b+1), 'time:', time.time() - start, 'progress',round(100*float(b+1)/len(mini_batches),2),'%'
             loss, start = 0, time.time()
@@ -141,7 +160,7 @@ class SRLLSTM:
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
                                       self.Predict(dev_path, options.sen_cut))
-                    os.system('perl src/utils/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
+                    os.system('perl ~/coling/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
                     labeled_f, unlabeled_f = get_scores(
