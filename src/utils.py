@@ -121,7 +121,8 @@ def get_batches(buckets, model, is_train, sen_cut):
                     cur_c_len = max(cur_c_len, max([len(w.norm) for w in d.entries]))
                     cur_len = max(cur_len, len(d))
 
-            if cur_len * len(batch) >= model.options.batch:
+            b = model.options.batch if is_train else model.options.dev_batch_size
+            if cur_len * len(batch) >= b:
                 add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model)
                 batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
 
