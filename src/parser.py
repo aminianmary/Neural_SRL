@@ -73,7 +73,7 @@ if __name__ == '__main__':
             print 'best F-score before starting the epoch: ' + str(best_f_score)
             best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
-        if options.options.conll_dev == None:
+        if options.conll_dev == None:
             parser.Save(os.path.join(options.outdir, options.model))
 
     sen_cut = options.sen_cut
