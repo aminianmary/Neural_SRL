@@ -41,6 +41,7 @@ if __name__ == '__main__':
     parser.add_option("--region", action="store_false", dest="region", default=True, help='Use predicate boolean flag.')
     parser.add_option("--dynet-gpu", action="store_true", dest="--dynet-gpu", default=False,
                       help='Use GPU instead of cpu.')
+    parser.add_option("--use_lemma", action="store_true", dest="use_lemma", default=False)
 
     (options, args) = parser.parse_args()
     print 'Using external embedding:', options.external_embedding
@@ -51,12 +52,13 @@ if __name__ == '__main__':
         print options
         train_data = list(utils.read_conll(options.conll_train))
         words, pWords, pos, roles, chars = utils.vocab(train_data)
+        sense_mask = utils.sense_mask(train_data, roles, False)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
-            pickle.dump((words, pWords, pos, roles, chars, options), paramsfp)
+            pickle.dump((words, pWords, pos, roles, chars, sense_mask, options), paramsfp)
         print 'Finished collecting vocab'
 
         print 'Initializing blstm srl:'
-        parser = SRLLSTM(words, pWords, pos, roles, chars, options)
+        parser = SRLLSTM(words, pWords, pos, roles, chars, sense_mask, options)
         best_f_score = 0.0
 
         max_len = max([len(d) for d in train_data])
@@ -73,30 +75,30 @@ if __name__ == '__main__':
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 
     sen_cut = options.sen_cut
-
+    use_lemma = options.use_lemma
     if options.input and options.output:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
-            words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+            words, lemmas, pos, roles, chars, sense_mask, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser = SRLLSTM(words, lemmas, pos, roles, chars, sense_mask, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
-        pred = list(parser.Predict(options.input, sen_cut))
+        pred = list(parser.Predict(options.input, sense_mask,use_lemma,sen_cut))
         te = time.time()
         utils.write_conll(options.output, pred)
         print 'Finished predicting test', te - ts
 
     if options.inputdir and options.outputdir:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
-            words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+            words, lemmas, pos, roles, chars, sense_mask, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser = SRLLSTM(words, lemmas, pos, roles, chars, sense_mask, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         for dir, subdir, files in os.walk(options.inputdir):
             for f in files:
                 print 'predicting ' + os.path.join(dir, f)
-                pred = list(parser.Predict(os.path.join(dir, f)), sen_cut)
+                pred = list(parser.Predict(os.path.join(dir, f)), sense_mask ,use_lemma,sen_cut)
 
                 utils.write_conll(options.outputdir + '/' + f + '.srl', pred)
         te = time.time()

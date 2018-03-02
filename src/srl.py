@@ -1,11 +1,11 @@
 from dynet import *
-from utils import read_conll, get_batches, get_scores, write_conll, eval_sense
+from utils import read_conll, get_batches, get_scores, write_conll, eval_sense, get_predicates_list
 import time, random, os,math
 import numpy as np
 
 
 class SRLLSTM:
-    def __init__(self, words, pWords,  pos, senses, chars, options):
+    def __init__(self, words, pWords,  pos, senses, chars, sense_mask, options):
         self.model = Model()
         self.options = options
         self.batch_size = options.batch
@@ -20,6 +20,7 @@ class SRLLSTM:
         senses = ['<UNK>'] + senses
         self.senses = {s: ind for ind, s in enumerate(senses)}
         self.isenses = senses
+        self.sense_mask = sense_mask
         self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
         self.d_cw = options.d_cw
@@ -147,7 +148,7 @@ class SRLLSTM:
                 if dev_path != '':
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, options.sen_cut))
+                                      self.Predict(dev_path, self.sense_mask ,options.use_lemma ,options.sen_cut))
                     accuracy = eval_sense(dev_path, os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt')
 
                     if float(accuracy) > best_f_score:
@@ -158,7 +159,7 @@ class SRLLSTM:
         print 'best part on this epoch: '+ str(best_part)
         return best_f_score
 
-    def Predict(self, conll_path, sen_cut):
+    def Predict(self, conll_path, sense_mask , is_lemma , sen_cut):
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
@@ -166,7 +167,9 @@ class SRLLSTM:
             dev_buckets[0].append(d)
         minibatches = get_batches(dev_buckets, self, False, sen_cut)
         outputs = self.decode(minibatches)
-        results = [self.isenses[np.argmax(outputs[i])] for i in range(len(outputs))]
+        dev_predicate_words = get_predicates_list(dev_data, is_lemma)
+        outputs_ = [outputs[i] + sense_mask[dev_predicate_words[i]] for i in range(len(outputs))]
+        results = [self.isenses[np.argmax(outputs_[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
             for p in sentence.predicates:

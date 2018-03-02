@@ -63,6 +63,33 @@ def vocab(sentences, min_count=2):
     return (list(words), list(pWords),
             list(posCount), list(psenseCount.keys()), list(chars))
 
+def sense_mask (sentences, senses, is_lemma):
+    senses = ['<UNK>'] + senses
+    sense_dic = {s: ind for ind, s in enumerate(senses)}
+    sense_mask = {}
+    for sentence in sentences:
+        for node in sentence.entries:
+            if node.is_pred:
+                word =  node.norm if not is_lemma else node.lemma
+                s = node.sense
+                s_index = sense_dic[s]
+                if word in sense_mask:
+                    sense_mask[word][s_index] = 0
+                else:
+                    sense_mask[word] = [-np.inf for _ in xrange(len(senses))]
+                    sense_mask[word][s_index] = 0
+    return sense_mask
+
+def get_predicates_list (sentences, is_lemma):
+    p = []
+    for sentence in sentences:
+        for node in sentence.entries:
+            if node.is_pred:
+                word = node.norm if not is_lemma else node.lemma
+                p.append(word)
+    return p
+
+
 def read_conll(fh):
     sentences = codecs.open(fh, 'r').read().strip().split('\n\n')
     read = 0
