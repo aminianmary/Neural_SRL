@@ -170,6 +170,13 @@ class SRLLSTM:
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
             for p in sentence.predicates:
-                sentence.entries[p].sense = results[offset]
+                prediction = results[offset]
+                prediction_stem = prediction.split('.')[0]
+                word = sentence.entries[p].form.lower()
+                k = min(len(prediction_stem), len(word), 3)
+                if prediction_stem[0:k] != word[0:k]:
+                    sentence.entries[p].sense = word+'.01'
+                else:
+                    sentence.entries[p].sense = prediction
                 offset+=1
             yield sentence
