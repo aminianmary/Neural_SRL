@@ -40,6 +40,7 @@ def vocab(sentences, min_count=2):
     posCount = Counter()
     psenseCount = Counter()
     pWordCount = Counter()
+    pLemmaCount = Counter()
     chars = set()
 
     for sentence in sentences:
@@ -48,6 +49,7 @@ def vocab(sentences, min_count=2):
         for node in sentence.entries:
             if node.is_pred:
                 pWordCount.update([node.norm])
+                pLemmaCount.update([node.lemma])
                 psenseCount.update([node.sense])
             for c in list(node.form):
                     chars.add(c.lower())
@@ -60,33 +62,35 @@ def vocab(sentences, min_count=2):
     for l in pWordCount.keys():
         if pWordCount[l] >= min_count:
             pWords.add(l)
-    return (list(words), list(pWords),
+    pLemmas = set()
+    for l in pLemmaCount.keys():
+        if pLemmaCount[l] >= min_count:
+            pLemmas.add(l)
+    return (list(words), list(pWords), list(pLemmas),
             list(posCount), list(psenseCount.keys()), list(chars))
 
-def sense_mask (sentences, senses, is_lemma):
+def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
     senses = ['<UNK>'] + senses
+    pwords_dic = {word: ind + 2 for ind, word in enumerate(pwords)} if not use_lemma \
+        else {word: ind + 2 for ind, word in enumerate(plemmas)}
     sense_dic = {s: ind for ind, s in enumerate(senses)}
-    sense_mask = {}
+    sense_mask = np.full((len(pwords)+2, len(senses)), -np.inf)
+    sense_mask[0] = [0]*len(senses)
+    sense_mask[1] = [0]*len(senses)
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
-                word =  node.norm if not is_lemma else node.lemma
-                s = node.sense
-                s_index = sense_dic[s]
-                if word in sense_mask:
-                    sense_mask[word][s_index] = 0
-                else:
-                    sense_mask[word] = [-np.inf for _ in xrange(len(senses))]
-                    sense_mask[word][s_index] = 0
+                word =  node.norm if not use_lemma else node.lemma
+                sense_mask[pwords_dic[word]][sense_dic[node.sense]] = 0
     return sense_mask
 
-def get_predicates_list (sentences, is_lemma):
+def get_predicates_list (sentences, pWords, is_lemma):
     p = []
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
                 word = node.norm if not is_lemma else node.lemma
-                p.append(word)
+                p.append(pWords[word] if word in pWords else 0)
     return p
 
 

@@ -5,7 +5,7 @@ import numpy as np
 
 
 class SRLLSTM:
-    def __init__(self, words, pWords,  pos, senses, chars, sense_mask, options):
+    def __init__(self, words, pWords, plemmas, pos, senses, chars, sense_mask, options):
         self.model = Model()
         self.options = options
         self.batch_size = options.batch
@@ -15,6 +15,8 @@ class SRLLSTM:
         self.PAD = 1
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
+        self.pWords = {word: ind + 2 for ind,word in enumerate(pWords)}
+        self.plemmas = {word: ind + 2 for ind,word in enumerate(plemmas)}
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         senses = ['<UNK>'] + senses
@@ -148,7 +150,7 @@ class SRLLSTM:
                 if dev_path != '':
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, self.sense_mask ,options.use_lemma ,options.sen_cut))
+                                      self.Predict(dev_path, options.use_lemma ,options.sen_cut))
                     accuracy = eval_sense(dev_path, os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt')
 
                     if float(accuracy) > best_f_score:
@@ -159,7 +161,7 @@ class SRLLSTM:
         print 'best part on this epoch: '+ str(best_part)
         return best_f_score
 
-    def Predict(self, conll_path, sense_mask , is_lemma , sen_cut):
+    def Predict(self, conll_path, use_lemma, sen_cut):
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
@@ -167,8 +169,9 @@ class SRLLSTM:
             dev_buckets[0].append(d)
         minibatches = get_batches(dev_buckets, self, False, sen_cut)
         outputs = self.decode(minibatches)
-        dev_predicate_words = get_predicates_list(dev_data, is_lemma)
-        outputs_ = [outputs[i] + sense_mask[dev_predicate_words[i]] for i in range(len(outputs))]
+        pwords = self.pWords if not use_lemma else self.plemmas
+        dev_predicate_words = get_predicates_list(dev_data, pwords, use_lemma)
+        outputs_ = [outputs[i] + self.sense_mask[dev_predicate_words[i]] for i in range(len(outputs))]
         results = [self.isenses[np.argmax(outputs_[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
