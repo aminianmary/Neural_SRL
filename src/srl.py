@@ -150,7 +150,7 @@ class SRLLSTM:
                 if dev_path != '':
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, options.use_lemma ,options.sen_cut))
+                                      self.Predict(dev_path, options.sen_cut, options.use_lemma, options.use_default_sense))
                     accuracy = eval_sense(dev_path, os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt')
 
                     if float(accuracy) > best_f_score:
@@ -161,7 +161,7 @@ class SRLLSTM:
         print 'best part on this epoch: '+ str(best_part)
         return best_f_score
 
-    def Predict(self, conll_path, use_lemma, sen_cut):
+    def Predict(self, conll_path, sen_cut, use_lemma, use_default_sense):
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
@@ -170,12 +170,13 @@ class SRLLSTM:
         minibatches = get_batches(dev_buckets, self, False, sen_cut)
         outputs = self.decode(minibatches)
         pwords = self.pWords if not use_lemma else self.plemmas
-        dev_predicate_words = get_predicates_list(dev_data, pwords, use_lemma)
+        dev_predicate_words = get_predicates_list(dev_data, pwords, use_lemma, use_default_sense)
         outputs_ = [outputs[i] + self.sense_mask[dev_predicate_words[i]] for i in range(len(outputs))]
         results = [self.isenses[np.argmax(outputs_[i])] for i in range(len(outputs))]
         offset = 0
         for iSentence, sentence in enumerate(dev_data):
             for p in sentence.predicates:
-                sentence.entries[p].sense = results[offset]
+                res = results[offset] if results[offset] != '<UNK>' else sentence.entries[p].norm+'.01'
+                sentence.entries[p].sense = res
                 offset+=1
             yield sentence

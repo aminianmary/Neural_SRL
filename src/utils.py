@@ -76,7 +76,8 @@ def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
     sense_dic = {s: ind for ind, s in enumerate(senses)}
     sense_mask = np.full((len(pwords)+2, len(senses)), -np.inf)
     sense_mask[0] = [0]*len(senses)
-    sense_mask[1] = [0]*len(senses)
+    sense_mask[1] = [-np.inf]*len(senses)
+    sense_mask[1][0] = np.inf
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
@@ -86,13 +87,13 @@ def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
                 sense_mask[w_index][s_index] = 0
     return sense_mask
 
-def get_predicates_list (sentences, pWords, is_lemma):
+def get_predicates_list (sentences, pWords, use_lemma, use_default):
     p = []
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
-                word = node.norm if not is_lemma else node.lemma
-                p.append(pWords[word] if word in pWords else 0)
+                word = node.norm if not use_lemma else node.lemma
+                p.append(pWords[word] if word in pWords else (1 if use_default else 0))
     return p
 
 

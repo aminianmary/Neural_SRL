@@ -42,6 +42,8 @@ if __name__ == '__main__':
     parser.add_option("--dynet-gpu", action="store_true", dest="--dynet-gpu", default=False,
                       help='Use GPU instead of cpu.')
     parser.add_option("--use_lemma", action="store_true", dest="use_lemma", default=False)
+    parser.add_option("--use_default_sense", action="store_true", dest="use_default_sense", default=False)
+
 
     (options, args) = parser.parse_args()
     print 'Using external embedding:', options.external_embedding
@@ -76,6 +78,7 @@ if __name__ == '__main__':
 
     sen_cut = options.sen_cut
     use_lemma = options.use_lemma
+    use_default = options.use_default_sense
     if options.input and options.output:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
             words, pWords, plemmas, pos, roles, chars, sense_mask, stored_opt = pickle.load(paramsfp)
@@ -83,7 +86,7 @@ if __name__ == '__main__':
         parser = SRLLSTM(words, pWords, plemmas, pos, roles, chars, sense_mask, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
-        pred = list(parser.Predict(options.input, use_lemma,sen_cut))
+        pred = list(parser.Predict(options.input, sen_cut, use_lemma, use_default))
         te = time.time()
         utils.write_conll(options.output, pred)
         print 'Finished predicting test', te - ts
@@ -98,7 +101,7 @@ if __name__ == '__main__':
         for dir, subdir, files in os.walk(options.inputdir):
             for f in files:
                 print 'predicting ' + os.path.join(dir, f)
-                pred = list(parser.Predict(os.path.join(dir, f)), use_lemma,sen_cut)
+                pred = list(parser.Predict(os.path.join(dir, f)), sen_cut, use_lemma, use_default)
 
                 utils.write_conll(options.outputdir + '/' + f + '.srl', pred)
         te = time.time()
