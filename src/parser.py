@@ -18,6 +18,8 @@ if __name__ == '__main__':
     parser.add_option("--extrn", dest="external_embedding", help="External embeddings", metavar="FILE")
     parser.add_option("--model", dest="model", help="Load/Save model file", metavar="FILE", default="model")
     parser.add_option("--d_w", type="int", dest="d_w", default=100)
+    parser.add_option("--d_l", type="int", dest="d_l", default=100)
+    parser.add_option("--d_pos", type="int", dest="d_pos", default=16)
     parser.add_option("--d_h", type="int", dest="d_h", default=512)
     parser.add_option("--d_c", type="int", dest="d_c", help="character embedding dimension", default=50)
     parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension for lemma", default=100)
@@ -41,8 +43,10 @@ if __name__ == '__main__':
     parser.add_option("--region", action="store_false", dest="region", default=True, help='Use predicate boolean flag.')
     parser.add_option("--dynet-gpu", action="store_true", dest="--dynet-gpu", default=False,
                       help='Use GPU instead of cpu.')
-    parser.add_option("--use_lemma", action="store_true", dest="use_lemma", default=False)
-    parser.add_option("--use_default_sense", action="store_true", dest="use_default_sense", default=False)
+    parser.add_option("--default_sense", action="store_true", dest="default_sense", default=False)
+    parser.add_option("--lemma", action="store_true", dest="lemma", default=False)
+    parser.add_option("--pos", action="store_true", dest="pos", default=False)
+
 
 
     (options, args) = parser.parse_args()
@@ -77,8 +81,8 @@ if __name__ == '__main__':
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 
     sen_cut = options.sen_cut
-    use_lemma = options.use_lemma
-    use_default = options.use_default_sense
+    use_lemma = options.lemma
+    use_default = options.default_sense
     if options.input and options.output:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
             words, pWords, plemmas, pos, roles, chars, sense_mask, stored_opt = pickle.load(paramsfp)

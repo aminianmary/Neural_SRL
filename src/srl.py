@@ -16,7 +16,7 @@ class SRLLSTM:
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
         self.pWords = {word: ind + 2 for ind,word in enumerate(pWords)}
-        self.plemmas = {word: ind + 2 for ind,word in enumerate(plemmas)}
+        self.plemmas = {word: ind + 3 for ind,word in enumerate(plemmas)}
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         senses = ['<UNK>'] + senses
@@ -25,6 +25,8 @@ class SRLLSTM:
         self.sense_mask = sense_mask
         self.char_dict = {c: i + 2 for i, c in enumerate(chars)}
         self.d_w = options.d_w
+        self.d_pos = options.d_pos #pos embedding dim
+        self.d_l = options.d_l #lemma embedding dim
         self.d_cw = options.d_cw
         self.d_pw = options.d_pw
         self.d_h = options.d_h
@@ -50,15 +52,25 @@ class SRLLSTM:
         self.x_pe.init_row(1,self.noextrn)
         self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
+        self.inp_dim = self.d_w + \
+                       (self.edim if self.external_embedding is not None else 0) + \
+                       (self.d_l if options.lemma else self.d_cw) +(self.d_pos if options.pos else self.d_pw)
 
-        self.inp_dim = self.d_w + self.d_cw + self.d_pw + (self.edim if self.external_embedding is not None else 0)
-        self.lemma_char_lstm = BiRNNBuilder(self.lem_char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder)
-        self.pos_char_lstm = BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder)
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
+        self.lemma_char_lstm = BiRNNBuilder(self.lem_char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder) \
+            if not options.lemma else None
+        self.pos_char_lstm = BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder)\
+            if not options.pos else None
+        self.x_le = self.model.add_lookup_parameters((len(self.plemmas) + 3, self.d_l))
+        self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) # lemma character embedding
         self.W = self.model.add_parameters((len(self.isenses), self.d_h * 2))
         self.b = self.model.add_parameters((len(self.isenses)), init = ConstInitializer(0))
+        self.empty_lemma_embed = inputVector([0]*self.d_l)
+        self.use_lemma = options.lemma
+        self.use_pos= options.pos
+
 
     def Save(self, filename):
         self.model.save(filename)
@@ -66,27 +78,29 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, chars):
+    def rnn(self, words, pwords, chars, pos, lemmas):
         cembed = [lookup_batch(self.ce, c) for c in chars]
-        lem_char_fwd, lem_char_bckd = self.lemma_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
-                              self.lemma_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
-        pos_char_fwd, pos_char_bckd = self.pos_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
-                              self.pos_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
-        lem_crnn = reshape(concatenate_cols([lem_char_fwd, lem_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
-        pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]), (self.d_pw, words.shape[0] * words.shape[1]))
-        lem_cnn_reps = [list() for _ in range(len(words))]
-        pos_cnn_reps = [list() for _ in range(len(words))]
 
-        # first dim: word position; second dim: sentence number.
-        for i in range(words.shape[0]):
-            lem_cnn_reps[i] = pick_batch(lem_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+        if not self.use_lemma:
+            lem_char_fwd, lem_char_bckd = self.lemma_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                                  self.lemma_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+            lem_crnn = reshape(concatenate_cols([lem_char_fwd, lem_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
+            lem_cnn_reps = [list() for _ in range(len(words))]
+            # first dim: word position; second dim: sentence number.
+            for i in range(words.shape[0]):
+                lem_cnn_reps[i] = pick_batch(lem_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
-        for i in range(words.shape[0]):
-            pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+        if not self.use_pos:
+            pos_char_fwd, pos_char_bckd = self.pos_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
+                                  self.pos_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+            pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]), (self.d_pw, words.shape[0] * words.shape[1]))
+            pos_cnn_reps = [list() for _ in range(len(words))]
+            for i in range(words.shape[0]):
+                pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]), lookup_batch(self.x_pe, pwords[i]),
-                                pos_cnn_reps[i],
-                               lem_cnn_reps[i]]) for i in range(len(words))]
+                               lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
+                               lookup_batch(self.x_pos, pos[i]) if self.use_pos else pos_cnn_reps[i]]) for i in range(len(words))]
 
         for fb, bb in self.deep_lstms.builder_layers:
             f, b = fb.initial_state(), bb.initial_state()
@@ -94,9 +108,10 @@ class SRLLSTM:
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
         return inputs
 
+
     def buildGraph(self, minibatch, is_train):
-        words, pos, pwords, pos, pred_lemmas_index, chars, senses, masks = minibatch
-        bilstms = self.rnn(words, pwords, chars)
+        words, pos, pwords, pos, lemmas, pred_lemmas, pred_lemmas_index, chars, senses, masks = minibatch
+        bilstms = self.rnn(words, pwords, chars, pos, lemmas)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         senses, masks = senses.T, masks.T
 
@@ -150,7 +165,7 @@ class SRLLSTM:
                 if dev_path != '':
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, options.sen_cut, options.use_lemma, options.use_default_sense))
+                                      self.Predict(dev_path, options.sen_cut, options.default_sense))
                     accuracy = eval_sense(dev_path, os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt')
 
                     if float(accuracy) > best_f_score:
@@ -161,7 +176,7 @@ class SRLLSTM:
         print 'best part on this epoch: '+ str(best_part)
         return best_f_score
 
-    def Predict(self, conll_path, sen_cut, use_lemma, use_default_sense):
+    def Predict(self, conll_path, sen_cut, use_default_sense):
         print 'starting to decode...'
         dev_buckets = [list()]
         dev_data = list(read_conll(conll_path))
@@ -169,8 +184,7 @@ class SRLLSTM:
             dev_buckets[0].append(d)
         minibatches = get_batches(dev_buckets, self, False, sen_cut)
         outputs = self.decode(minibatches)
-        pwords = self.pWords if not use_lemma else self.plemmas
-        dev_predicate_words = get_predicates_list(dev_data, pwords, use_lemma, use_default_sense)
+        dev_predicate_words = get_predicates_list(dev_data, self.pwords,self.plemmas, self.use_lemma, use_default_sense)
         outputs_ = [outputs[i] + self.sense_mask[dev_predicate_words[i]] for i in range(len(outputs))]
         results = [self.isenses[np.argmax(outputs_[i])] for i in range(len(outputs))]
         offset = 0

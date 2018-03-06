@@ -87,13 +87,21 @@ def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
                 sense_mask[w_index][s_index] = 0
     return sense_mask
 
-def get_predicates_list (sentences, pWords, use_lemma, use_default):
+def get_predicates_list (sentences, pWords, plemmas, use_lemma, use_default):
     p = []
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
                 word = node.norm if not use_lemma else node.lemma
-                p.append(pWords[word] if word in pWords else (1 if use_default else 0))
+                p = -1
+                if use_lemma:
+                    lemma = node.lemma
+                    p = plemmas[lemma] if lemma in plemmas else (1 if use_default else 0)
+                else:
+                    word = node.norm
+                    p = pWords[word] if word in pWords else (1 if use_default else 0)
+
+                p.append(p)
     return p
 
 
@@ -174,6 +182,11 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
     pos = np.array([np.array(
         [model.pos.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD for i in
          range(len(batch))]) for j in range(cur_len)])
+    lemmas = np.array([np.array(
+        [(model.plemmas.get(batch[i][j].lemma, 0) if pred_ids[i][1] == j else model.NO_LEMMA) if j < len(
+            batch[i]) else model.PAD for i in
+         range(len(batch))]) for j in range(cur_len)])
+    pred_lemmas = np.array([model.plemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
     pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     senses = np.array([np.array(
         [model.senses.get(batch[i][j].sense, 0) if j < len(batch[i]) else 0 for i in
@@ -183,7 +196,7 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
                       c in range(cur_c_len)])
     chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
     masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].sense !='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pos, pwords, pos, pred_lemmas_index, chars, senses, masks))
+    mini_batches.append((words, pos, pwords, pos, lemmas, pred_lemmas, pred_lemmas_index, chars, senses, masks))
 
 
 def get_scores(fp):
