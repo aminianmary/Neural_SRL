@@ -80,8 +80,10 @@ def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
-                word =  node.norm if not use_lemma else node.lemma
-                sense_mask[pwords_dic[word]][sense_dic[node.sense]] = 0
+                word = node.norm if not use_lemma else node.lemma
+                w_index = pwords_dic[word] if word in pwords_dic else 0
+                s_index = sense_dic[node.sense]
+                sense_mask[w_index][s_index] = 0
     return sense_mask
 
 def get_predicates_list (sentences, pWords, is_lemma):
