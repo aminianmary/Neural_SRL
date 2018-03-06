@@ -71,10 +71,11 @@ def vocab(sentences, min_count=2):
 
 def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
     senses = ['<UNK>'] + senses
-    pwords_dic = {word: ind + 2 for ind, word in enumerate(pwords)} if not use_lemma \
-        else {word: ind + 2 for ind, word in enumerate(plemmas)}
+    p = pwords if not use_lemma else plemmas
+    p_len = len(pwords)+2 if not use_lemma else len(plemmas)+2
+    p_dic = {word: ind + 2 for ind, word in enumerate(p)}
     sense_dic = {s: ind for ind, s in enumerate(senses)}
-    sense_mask = np.full((len(pwords)+2, len(senses)), -np.inf)
+    sense_mask = np.full((p_len, len(senses)), -np.inf)
     sense_mask[0] = [0]*len(senses)
     sense_mask[1] = [-np.inf]*len(senses)
     sense_mask[1][0] = np.inf
@@ -82,7 +83,7 @@ def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
         for node in sentence.entries:
             if node.is_pred:
                 word = node.norm if not use_lemma else node.lemma
-                w_index = pwords_dic[word] if word in pwords_dic else 0
+                w_index = p_dic[word] if word in p_dic else 0
                 s_index = sense_dic[node.sense]
                 sense_mask[w_index][s_index] = 0
     return sense_mask
@@ -92,16 +93,14 @@ def get_predicates_list (sentences, pWords, plemmas, use_lemma, use_default):
     for sentence in sentences:
         for node in sentence.entries:
             if node.is_pred:
-                word = node.norm if not use_lemma else node.lemma
-                p = -1
+                p_index = -1
                 if use_lemma:
                     lemma = node.lemma
-                    p = plemmas[lemma] if lemma in plemmas else (1 if use_default else 0)
+                    p_index = plemmas[lemma] if lemma in plemmas else (1 if use_default else 0)
                 else:
                     word = node.norm
-                    p = pWords[word] if word in pWords else (1 if use_default else 0)
-
-                p.append(p)
+                    p_index = pWords[word] if word in pWords else (1 if use_default else 0)
+                p.append(p_index)
     return p
 
 

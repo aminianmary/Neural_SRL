@@ -16,7 +16,7 @@ class SRLLSTM:
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
         self.pWords = {word: ind + 2 for ind,word in enumerate(pWords)}
-        self.plemmas = {word: ind + 3 for ind,word in enumerate(plemmas)}
+        self.plemmas = {word: ind + 2 for ind,word in enumerate(plemmas)}
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         senses = ['<UNK>'] + senses
@@ -184,7 +184,7 @@ class SRLLSTM:
             dev_buckets[0].append(d)
         minibatches = get_batches(dev_buckets, self, False, sen_cut)
         outputs = self.decode(minibatches)
-        dev_predicate_words = get_predicates_list(dev_data, self.pwords,self.plemmas, self.use_lemma, use_default_sense)
+        dev_predicate_words = get_predicates_list(dev_data, self.pWords, self.plemmas, self.use_lemma, use_default_sense)
         outputs_ = [outputs[i] + self.sense_mask[dev_predicate_words[i]] for i in range(len(outputs))]
         results = [self.isenses[np.argmax(outputs_[i])] for i in range(len(outputs))]
         offset = 0
