@@ -47,9 +47,10 @@ if __name__ == '__main__':
     parser.add_option("--lemma", action="store_true", dest="lemma", default=False)
     parser.add_option("--pos", action="store_true", dest="pos", default=False)
 
-
-
     (options, args) = parser.parse_args()
+    sen_cut = options.sen_cut
+    use_lemma = options.lemma
+    use_default = options.default_sense
     print 'Using external embedding:', options.external_embedding
     from srl import SRLLSTM
 
@@ -58,7 +59,7 @@ if __name__ == '__main__':
         print options
         train_data = list(utils.read_conll(options.conll_train))
         words, pWords, plemmas ,pos, roles, chars = utils.vocab(train_data)
-        sense_mask = utils.sense_mask(train_data, roles, pWords, plemmas, False)
+        sense_mask = utils.sense_mask(train_data, roles, pWords, plemmas, use_lemma)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
             pickle.dump((words, pWords, plemmas, pos, roles, chars, sense_mask, options), paramsfp)
         print 'Finished collecting vocab'
@@ -80,9 +81,6 @@ if __name__ == '__main__':
             best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
 
-    sen_cut = options.sen_cut
-    use_lemma = options.lemma
-    use_default = options.default_sense
     if options.input and options.output:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
             words, pWords, plemmas, pos, roles, chars, sense_mask, stored_opt = pickle.load(paramsfp)

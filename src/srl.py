@@ -16,7 +16,7 @@ class SRLLSTM:
         self.NO_LEMMA = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)}
         self.pWords = {word: ind + 2 for ind,word in enumerate(pWords)}
-        self.plemmas = {word: ind + 2 for ind,word in enumerate(plemmas)}
+        self.plemmas = {word: ind + 3 for ind,word in enumerate(plemmas)}
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)}
         self.ipos = ['<UNK>', '<PAD>'] + pos
         senses = ['<UNK>'] + senses

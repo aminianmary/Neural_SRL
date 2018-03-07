@@ -72,8 +72,8 @@ def vocab(sentences, min_count=2):
 def sense_mask (sentences, senses, pwords, plemmas, use_lemma):
     senses = ['<UNK>'] + senses
     p = pwords if not use_lemma else plemmas
-    p_len = len(pwords)+2 if not use_lemma else len(plemmas)+2
-    p_dic = {word: ind + 2 for ind, word in enumerate(p)}
+    p_len = len(pwords)+2 if not use_lemma else len(plemmas)+3
+    p_dic = {word: ind + 2 for ind, word in enumerate(p)} if not use_lemma else {word: ind + 3 for ind, word in enumerate(p)}
     sense_dic = {s: ind for ind, s in enumerate(senses)}
     sense_mask = np.full((p_len, len(senses)), -np.inf)
     sense_mask[0] = [0]*len(senses)
