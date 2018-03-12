@@ -168,7 +168,7 @@ class SRLLSTM:
                                       self.Predict(dev_path, options.sen_cut, options.default_sense))
                     accuracy = eval_sense(dev_path, os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt')
 
-                    if float(accuracy) > best_f_score:
+                    if float(accuracy) >= best_f_score:
                         self.Save(os.path.join(options.outdir, options.model))
                         best_f_score = accuracy
                         best_part = part
