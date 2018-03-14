@@ -114,7 +114,6 @@ def get_batches(buckets, model, is_train, sen_cut):
     mini_batches = []
     batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
     b = model.options.batch if is_train else model.options.dev_batch_size
-
     for dc in d_copy:
         for d in dc:
             if (is_train and len(d)<=sen_cut) or not is_train:
@@ -136,30 +135,34 @@ def get_batches(buckets, model, is_train, sen_cut):
 
 
 def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
+    #formed to work in the batch mode
     words = np.array([np.array(
-        [model.words.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in
+        [model.words.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD_index for i in
          range(len(batch))]) for j in range(cur_len)])
     pwords = np.array([np.array(
-        [model.x_pe_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
-    pos = np.array([np.array(
-        [model.pos.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD for i in
+        [model.x_pe_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD_index for i in
          range(len(batch))]) for j in range(cur_len)])
     lemmas = np.array([np.array(
-        [(model.pred_lemmas.get(batch[i][j].lemma, 0) if pred_ids[i][1]==j else model.NO_LEMMA)if j < len(batch[i]) else model.PAD for i in
-         range(len(batch))]) for j in range(cur_len)])
-    pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0) if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
-    pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
+        [(model.pred_lemmas.get(batch[i][j].lemma, 0) if pred_ids[i][1]==j else model.NO_LEMMA_index)if j < len(batch[i])
+         else model.PAD_index for i in range(len(batch))]) for j in range(cur_len)]) if model.use_lemma else None
+    pos = np.array([np.array(
+        [model.pos.get(batch[i][j].pos, 0) if j < len(batch[i]) else model.PAD_index for i in
+         range(len(batch))]) for j in range(cur_len)]) if model.use_pos else None
     roles = np.array([np.array(
-        [model.roles.get(batch[i][j].predicateList[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD for i in
+        [model.roles.get(batch[i][j].predicateList[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD_index for i in
          range(len(batch))]) for j in range(cur_len)])
     chars = np.array([[[model.chars.get(batch[i][j].form[c].lower(), 0) if 0 < j < len(batch[i]) and c < len(
         batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(len(batch))] for j in range(cur_len)] for
                       c in range(cur_c_len)])
     chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
+
+
+    pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0)
+                                     if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
+    pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
+    pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pwords, pos, lemmas, pred_lemmas, pred_lemmas_index, chars, roles, pred_flags, masks))
+    mini_batches.append((words, pwords, lemmas, pos, roles, chars, pred_flags, pred_lemmas, pred_lemmas_index, masks))
 
 
 def get_scores(fp):

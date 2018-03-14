@@ -23,7 +23,12 @@ if __name__ == '__main__':
     parser.add_option("--d_h", type="int", dest="d_h", default=512)
     parser.add_option("--d_r", type="int", dest="d_r", default=128)
     parser.add_option("--d_prime_l", type="int", dest="d_prime_l", default=128)
+    parser.add_option("--d_c", type="int", dest="d_c", help="character embedding dimension", default=50)
+    parser.add_option("--d_cw", type="int", dest="d_cw", help="character lstm dimension for lemma", default=100)
+    parser.add_option("--d_pw", type="int", dest="d_pw", help="character lstm dimension for pos", default=100)
     parser.add_option("--k", type="int", dest="k", default=4)
+    parser.add_option("--lem_char_k", type="int", dest="lem_char_k", default=1)
+    parser.add_option("--pos_char_k", type="int", dest="pos_char_k", default=1)
     parser.add_option("--batch", type="int", dest="batch", default=10000)
     parser.add_option("--dev_batch_size", type="int", dest="dev_batch_size", default=200)
     parser.add_option("--alpha", type="float", dest="alpha", default=0.25)
@@ -40,6 +45,9 @@ if __name__ == '__main__':
     parser.add_option("--region", action="store_false", dest="region", default=True, help='Use predicate boolean flag.')
     parser.add_option("--dynet-gpu", action="store_true", dest="--dynet-gpu", default=False,
                       help='Use GPU instead of cpu.')
+    parser.add_option("--lemma", action="store_true", dest="lemma", default=False, help='Use lemma in model')
+    parser.add_option("--pos", action="store_true", dest="pos", default=False, help='Use pos in model')
+
 
     (options, args) = parser.parse_args()
     print 'Using external embedding:', options.external_embedding
@@ -68,7 +76,8 @@ if __name__ == '__main__':
         for epoch in xrange(options.epochs):
             print 'Starting epoch', epoch
             print 'best F-score before starting the epoch: ' + str(best_f_score)
-            best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut), epoch, best_f_score, options)
+            best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut),
+                                        epoch, best_f_score, options)
             print 'best F-score after finishing the epoch: ' + str(best_f_score)
         if options.conll_dev == None:
             parser.Save(os.path.join(options.outdir, options.model))
