@@ -151,9 +151,16 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
     roles = np.array([np.array(
         [model.roles.get(batch[i][j].predicateList[pred_ids[i][0]], 0) if j < len(batch[i]) else model.PAD_index for i in
          range(len(batch))]) for j in range(cur_len)])
-    chars = np.array([[[model.chars.get(batch[i][j].form[c].lower(), 0) if 0 < j < len(batch[i]) and c < len(
-        batch[i][j].form) else (1 if j == 0 and c == 0 else 0) for i in range(len(batch))] for j in range(cur_len)] for
-                      c in range(cur_c_len)])
+    chars = [list() for _ in range(cur_c_len)]
+    for c_pos in range(cur_c_len):
+        ch = [model.PAD] * (len(batch) * cur_len)
+        offset = 0
+        for w_pos in range(cur_len):
+            for sen_position in range(len(batch)):
+                if w_pos < len(batch[sen_position]) and c_pos < len(batch[sen_position][w_pos].norm):
+                    ch[offset] = model.chars.get(batch[sen_position][w_pos].norm[c_pos], 0)
+                offset += 1
+        chars[c_pos] = np.array(ch)
     chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
 
 
