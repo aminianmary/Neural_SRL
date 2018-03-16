@@ -53,7 +53,7 @@ def vocab(sentences, min_count=2):
             for pred in node.predicateList.values():
                 if pred!='?':
                     semRelCount.update([pred])
-            for c in list(node.form):
+            for c in list(node.norm):
                     chars.add(c.lower())
 
     words = set()
@@ -102,9 +102,11 @@ def write_conll(fn, conll_structs):
                 fh.write('\n')
             fh.write('\n')
 
-numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+");
+numberRegex = re.compile("[0-9]+|[0-9]+\\.[0-9]+|[0-9]+[0-9,]+")
+urlRegex = re.compile("((https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*)")
+
 def normalize(word):
-    return 'NUM' if numberRegex.match(word) else word.lower()
+    return '<NUM>' if numberRegex.match(word) else ('<URL>' if urlRegex.match(word) else word.lower())
 
 def get_batches(buckets, model, is_train, sen_cut):
     d_copy = [buckets[i][:] for i in range(len(buckets))]
@@ -112,7 +114,7 @@ def get_batches(buckets, model, is_train, sen_cut):
         for dc in d_copy:
             random.shuffle(dc)
     mini_batches = []
-    batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
+    batch, pred_ids, cur_len, cur_c_len, cur_pred_c_len = [], [], 0, 0, 0
     b = model.options.batch if is_train else model.options.dev_batch_size
     for dc in d_copy:
         for d in dc:
@@ -122,19 +124,20 @@ def get_batches(buckets, model, is_train, sen_cut):
                     pred_ids.append([p,predicate])
                     cur_c_len = max(cur_c_len, max([len(w.norm) for w in d.entries]))
                     cur_len = max(cur_len, len(d))
+                    cur_pred_c_len = max(cur_pred_c_len, len(d.entries[predicate].norm))
 
             if cur_len * len(batch) >= b:
-                add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model)
-                batch, pred_ids, cur_len, cur_c_len = [], [], 0, 0
+                add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_batches, model)
+                batch, pred_ids, cur_len, cur_c_len, cur_pred_c_len = [], [], 0, 0, 0
 
     if len(batch)>0 and not is_train:
-        add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model)
+        add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_batches, model)
     if is_train:
         random.shuffle(mini_batches)
     return mini_batches
 
 
-def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
+def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_batches, model):
     #formed to work in the batch mode
     words = np.array([np.array(
         [model.words.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD_index for i in
@@ -153,23 +156,31 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, mini_batches, model):
          range(len(batch))]) for j in range(cur_len)])
     chars = [list() for _ in range(cur_c_len)]
     for c_pos in range(cur_c_len):
-        ch = [model.PAD] * (len(batch) * cur_len)
+        ch = [model.PAD_index] * (len(batch) * cur_len)
         offset = 0
         for w_pos in range(cur_len):
             for sen_position in range(len(batch)):
                 if w_pos < len(batch[sen_position]) and c_pos < len(batch[sen_position][w_pos].norm):
-                    ch[offset] = model.chars.get(batch[sen_position][w_pos].norm[c_pos], 0)
+                    ch[offset] = model.chars.get(batch[sen_position][w_pos].norm[c_pos].lower(), 0)
                 offset += 1
         chars[c_pos] = np.array(ch)
-    chars = np.transpose(np.reshape(chars, (len(batch) * cur_len, cur_c_len)))
+    chars = np.array(chars)
 
+    pred_chars = [list() for _ in range(cur_pred_c_len)]
+    for c_pos in range(cur_pred_c_len):
+        ch = [model.PAD_index] * len(batch)
+        for sen_position in range(len(batch)):
+            if c_pos < len(batch[sen_position][pred_ids[sen_position][1]].norm):
+                ch[sen_position] = model.chars.get(batch[sen_position][pred_ids[sen_position][1]].norm[c_pos].lower(), 0)
+        pred_chars[c_pos] = np.array(ch)
+    pred_chars = np.array(pred_chars)
 
     pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0)
                                      if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
-    pred_lemmas_index = np.array([pred_ids[i][1] for i in range(len(batch))])
+    pred_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pwords, lemmas, pos, roles, chars, pred_flags, pred_lemmas, pred_lemmas_index, masks))
+    mini_batches.append((words, pwords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks))
 
 
 def get_scores(fp):

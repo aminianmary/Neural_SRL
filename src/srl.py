@@ -79,7 +79,6 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
         self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l))
-        self.empty_lemma_embed = inputVector([0]*self.d_l) if self.use_lemma else inputVector([0]*options.d_cw)
 
     def Save(self, filename):
         self.model.save(filename)
@@ -87,30 +86,41 @@ class SRLLSTM:
     def Load(self, filename):
         self.model.populate(filename)
 
-    def rnn(self, words, pwords, pos, lemmas, pred_flags, chars):
-        cembed = [lookup_batch(self.ce, c) for c in chars] if (not self.use_lemma or not self.use_pos) else None
-        ul_cnn_reps = [list() for _ in range(len(words))] if not self.use_lemma else None
+    def transduce(self, rnn_builder, inputs):
+        for fb, bb in rnn_builder.builder_layers:
+            f, b = fb.initial_state(), bb.initial_state()
+            fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
+            inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
+        return inputs
+
+    def rnn(self, words, pwords, pos, lemmas, pred_flags, chars, pred_chars, pred_index):
+        cembed = [lookup_batch(self.ce, c) for c in chars] if (not self.use_pos) else None
+        pred_cembed = [lookup_batch(self.ce, c) for c in pred_chars] if (not self.use_lemma) else None
+        ul_cnn_reps = [list() for _ in range(len(words))] if not self.use_lemma else None # todo
 
         if not self.use_lemma:
-            lem_char_fwd, lem_char_bckd = self.lemma_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
-                                          self.lemma_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
+            # predicate lemma input char lstm (should be zero for others)
+            lem_crnn = self.transduce(self.lemma_char_lstm, pred_cembed)[-1]
+            lem_crnn = transpose(reshape(lem_crnn, (self.d_cw, pred_chars.shape[1])))
 
-            ul_char_fwd, ul_char_bckd = self.u_l_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
-                                        self.u_l_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
-
-            lem_crnn = reshape(concatenate_cols([lem_char_fwd, lem_char_bckd]), (self.d_cw, words.shape[0] * words.shape[1]))
-            ul_crnn = reshape(concatenate_cols([ul_char_fwd, ul_char_bckd]),(self.d_prime_l, words.shape[0] * words.shape[1]))
+            zero_vector = inputVector(np.zeros(self.d_cw, dtype=float))
             lem_cnn_reps = [list() for _ in range(len(words))]
-            for i in range(words.shape[0]):
-                lem_cnn_reps[i] = pick_batch(lem_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+            for word_position in range(words.shape[0]):
+                vectors = []
+                for batch_num in range(words.shape[1]):
+                    if word_position == pred_index[batch_num]:
+                        vectors.append(lem_crnn[batch_num])
+                    else:
+                        vectors.append(zero_vector)
+                lem_cnn_reps[word_position] = concatenate_to_batch(vectors)
 
-            for i in range(words.shape[0]):
-                ul_cnn_reps[i] = pick_batch(ul_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
+            # predicate lemma decoder representation
+            ul_crnn = self.transduce(self.u_l_char_lstm, pred_cembed)[-1]
+            ul_cnn_reps = transpose(reshape(ul_crnn, (self.d_prime_l, pred_chars.shape[1])))
 
         if not self.use_pos:
-            pos_char_fwd, pos_char_bckd = self.pos_char_lstm.builder_layers[0][0].initial_state().transduce(cembed)[-1], \
-                              self.pos_char_lstm.builder_layers[0][1].initial_state().transduce(reversed(cembed))[-1]
-            pos_crnn = reshape(concatenate_cols([pos_char_fwd, pos_char_bckd]), (self.d_pw, words.shape[0] * words.shape[1]))
+            pos_crnn = self.transduce(self.pos_char_lstm, cembed)[-1]
+            pos_crnn = reshape(pos_crnn, (self.d_pw, chars.shape[1])) #todo without transpose
             pos_cnn_reps = [list() for _ in range(len(words))]
             for i in range(words.shape[0]):
                 pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
@@ -122,25 +132,23 @@ class SRLLSTM:
                                lookup_batch(self.x_pos, pos[i]) if self.use_pos else pos_cnn_reps[i]]) for i in
                   range(len(words))]
 
-        for fb, bb in self.deep_lstms.builder_layers:
-            f, b = fb.initial_state(), bb.initial_state()
-            fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
-            inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
-        return inputs, ul_cnn_reps
+
+        rnn_res = self.transduce(self.deep_lstms, inputs)
+        return rnn_res, ul_cnn_reps
 
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, lemmas, pos, roles, chars, pred_flags, pred_lemmas, pred_lemmas_index, masks= minibatch
-        bilstms, ul_cnn_reps = self.rnn(words, pwords, pos, lemmas, pred_flags, chars)
+        words, pwords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
+        bilstms, ul_cnn_reps = self.rnn(words, pwords, pos, lemmas, pred_flags, chars, pred_chars, pred_index)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         if not self.use_lemma:
             ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
         roles, masks = roles.T, masks.T
 
         for sen in range(roles.shape[0]):
-            v_p = bilstms[pred_lemmas_index[sen]][sen]
-            u_l = self.u_l[pred_lemmas[sen]] if self.use_lemma else ul_cnn_reps[pred_lemmas_index[sen]][sen]
+            v_p = bilstms[pred_index[sen]][sen]
+            u_l = self.u_l[pred_lemmas[sen]] if self.use_lemma else reshape(ul_cnn_reps[sen], (self.d_prime_l,), 1)
             W = transpose(concatenate_cols(
                 [rectify(self.U.expr() * (concatenate([u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
 
@@ -186,7 +194,6 @@ class SRLLSTM:
             renew_cg()
             if self.use_lemma:
                 self.x_le.init_row(self.NO_LEMMA_index, [0] * self.d_l)
-            renew_cg()
             print 'loss:', loss/(b+1), 'time:', time.time() - start, 'progress',round(100*float(b+1)/len(mini_batches),2),'%'
             loss, start = 0, time.time()
             errs, sen_num = [], 0
