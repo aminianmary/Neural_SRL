@@ -47,6 +47,9 @@ if __name__ == '__main__':
                       help='Use GPU instead of cpu.')
     parser.add_option("--lemma", action="store_true", dest="lemma", default=False, help='Use lemma in model')
     parser.add_option("--pos", action="store_true", dest="pos", default=False, help='Use pos in model')
+    parser.add_option("--no_pos", action="store_true", dest="no_pos", default=False,
+                      help='pos is not modeled by embeddings or character models')
+
 
 
     (options, args) = parser.parse_args()

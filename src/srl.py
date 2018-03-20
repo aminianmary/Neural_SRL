@@ -9,6 +9,7 @@ class SRLLSTM:
         self.model = Model()
         self.use_lemma = options.lemma
         self.use_pos= options.pos
+        self.no_pos = options.no_pos
         self.options = options
         self.batch_size = options.batch
         self.trainer = AdamTrainer(self.model, options.learning_rate, options.beta1, options.beta2, options.eps)
@@ -55,7 +56,7 @@ class SRLLSTM:
 
         self.inp_dim = self.d_w +\
                        (self.d_l if self.use_lemma else self.d_cw)+ \
-                       (self.d_pos if self.use_pos else self.d_pw)+ \
+                       ((self.d_pos if self.use_pos else self.d_pw) if not self.no_pos else 0 )+ \
                        (self.edim if self.external_embedding is not None else 0) + \
                        (1 if self.region else 0)  # 1 for predicate indicator
 
@@ -65,7 +66,7 @@ class SRLLSTM:
             if not self.use_lemma else None
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos)) if self.use_pos else None
         self.pos_char_lstm = BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder) \
-            if not self.use_pos else None
+            if (not self.use_pos or not self.no_pos) else None
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) \
             if (not self.use_lemma or not self.use_pos) else None
         self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l)) \
@@ -94,7 +95,7 @@ class SRLLSTM:
         return inputs
 
     def rnn(self, words, pwords, pos, lemmas, pred_flags, chars, pred_chars, pred_index):
-        cembed = [lookup_batch(self.ce, c) for c in chars] if (not self.use_pos) else None
+        cembed = [lookup_batch(self.ce, c) for c in chars] if (not self.use_pos or not self.no_pos) else None
         pred_cembed = [lookup_batch(self.ce, c) for c in pred_chars] if (not self.use_lemma) else None
         ul_cnn_reps = [list() for _ in range(len(words))] if not self.use_lemma else None # todo
 
@@ -118,7 +119,7 @@ class SRLLSTM:
             ul_crnn = self.transduce(self.u_l_char_lstm, pred_cembed)[-1]
             ul_cnn_reps = transpose(reshape(ul_crnn, (self.d_prime_l, pred_chars.shape[1])))
 
-        if not self.use_pos:
+        if not self.use_pos or not self.no_pos:
             pos_crnn = self.transduce(self.pos_char_lstm, cembed)[-1]
             pos_crnn = reshape(pos_crnn, (self.d_pw, chars.shape[1])) #todo without transpose
             pos_cnn_reps = [list() for _ in range(len(words))]
@@ -126,6 +127,11 @@ class SRLLSTM:
                 pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]),
+                               lookup_batch(self.x_pe, pwords[i]),
+                               lookup_batch(self.pred_flag, pred_flags[i]),
+                               lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i]]) for i in
+                  range(len(words))] if self.no_pos  else \
+            [concatenate([lookup_batch(self.x_re, words[i]),
                                lookup_batch(self.x_pe, pwords[i]),
                                lookup_batch(self.pred_flag, pred_flags[i]),
                                lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
