@@ -56,7 +56,7 @@ class SRLLSTM:
 
         self.inp_dim = self.d_w +\
                        (self.d_l if self.use_lemma else self.d_cw)+ \
-                       ((self.d_pos if self.use_pos else self.d_pw) if not self.no_pos else 0 )+ \
+                       (0 if self.no_pos else (self.d_pos if self.use_pos else self.d_pw))+ \
                        (self.edim if self.external_embedding is not None else 0) + \
                        (1 if self.region else 0)  # 1 for predicate indicator
 
@@ -65,8 +65,7 @@ class SRLLSTM:
         self.lemma_char_lstm = BiRNNBuilder(self.lem_char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder) \
             if not self.use_lemma else None
         self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos)) if self.use_pos else None
-        self.pos_char_lstm = BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder) \
-            if (not self.use_pos or not self.no_pos) else None
+        self.pos_char_lstm = None if (self.no_pos or self.use_pos) else BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder)
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) \
             if (not self.use_lemma or not self.use_pos) else None
         self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l)) \
@@ -95,7 +94,7 @@ class SRLLSTM:
         return inputs
 
     def rnn(self, words, pwords, pos, lemmas, pred_flags, chars, pred_chars, pred_index):
-        cembed = [lookup_batch(self.ce, c) for c in chars] if (not self.use_pos or not self.no_pos) else None
+        cembed = None if (self.no_pos or self.use_pos) else [lookup_batch(self.ce, c) for c in chars]
         pred_cembed = [lookup_batch(self.ce, c) for c in pred_chars] if (not self.use_lemma) else None
         ul_cnn_reps = [list() for _ in range(len(words))] if not self.use_lemma else None # todo
 
@@ -119,7 +118,7 @@ class SRLLSTM:
             ul_crnn = self.transduce(self.u_l_char_lstm, pred_cembed)[-1]
             ul_cnn_reps = transpose(reshape(ul_crnn, (self.d_prime_l, pred_chars.shape[1])))
 
-        if not self.use_pos or not self.no_pos:
+        if not (self.no_pos or self.use_pos):
             pos_crnn = self.transduce(self.pos_char_lstm, cembed)[-1]
             pos_crnn = reshape(pos_crnn, (self.d_pw, chars.shape[1])) #todo without transpose
             pos_cnn_reps = [list() for _ in range(len(words))]
