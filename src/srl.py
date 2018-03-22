@@ -64,7 +64,7 @@ class SRLLSTM:
         self.x_le = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_l)) if self.use_lemma else None
         self.lemma_char_lstm = BiRNNBuilder(self.lem_char_k, options.d_c, options.d_cw, self.model, VanillaLSTMBuilder) \
             if not self.use_lemma else None
-        self.x_pos = self.model.add_lookup_parameters((len(pos)+2, self.d_pos)) if self.use_pos else None
+        self.x_pos = None if (self.no_pos or not self.use_pos) else self.model.add_lookup_parameters((len(pos)+2, self.d_pos))
         self.pos_char_lstm = None if (self.no_pos or self.use_pos) else BiRNNBuilder(self.pos_char_k, options.d_c, options.d_pw, self.model, VanillaLSTMBuilder)
         self.ce = self.model.add_lookup_parameters((len(chars) + 2, options.d_c)) \
             if (not self.use_lemma or not self.use_pos) else None
