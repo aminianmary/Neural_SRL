@@ -54,10 +54,30 @@ class SRLLSTM:
         self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
 
+        #related source word embeddings space (relsource_embedings)
+        self.x_rse = None
+        self.relsource_embedding=None
+        relsource_embedding_fp = open(options.relsource_embedding, 'r')
+        self.relsource_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(' ')[1:]] for line in
+                                    relsource_embedding_fp}
+
+        relsource_embedding_fp.close()
+        self.rsdim = len(self.relsource_embedding.values()[0])
+        self.norse = [0.0 for _ in xrange(self.rsdim)]
+        self.x_rse_dict = {word: i + 2 for i, word in enumerate(self.relsource_embedding)}
+        self.x_rse = self.model.add_lookup_parameters((len(self.relsource_embedding) + 2, self.rsdim))
+        for word, i in self.x_rse_dict.iteritems():
+            self.x_rse.init_row(i, self.relsource_embedding[word])
+        self.x_rse.init_row(0, self.norse)
+        self.x_rse.init_row(1, self.norse)
+        self.x_rse.set_updated(False)
+        print 'Load relsource embedding. Vector dimensions', self.rsdim
+
         self.inp_dim = self.d_w +\
                        (self.d_l if self.use_lemma else self.d_cw)+ \
                        (0 if self.no_pos else (self.d_pos if self.use_pos else self.d_pw))+ \
                        (self.edim if self.external_embedding is not None else 0) + \
+                       (self.rsdim if self.relsource_embedding is not None else 0) + \
                        (1 if self.region else 0)  # 1 for predicate indicator
 
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
@@ -93,7 +113,7 @@ class SRLLSTM:
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
         return inputs
 
-    def rnn(self, words, pwords, pos, lemmas, pred_flags, chars, pred_chars, pred_index):
+    def rnn(self, words, pwords, rswords, pos, lemmas, pred_flags, chars, pred_chars, pred_index):
         cembed = None if (self.no_pos or self.use_pos) else [lookup_batch(self.ce, c) for c in chars]
         pred_cembed = [lookup_batch(self.ce, c) for c in pred_chars] if (not self.use_lemma) else None
         ul_cnn_reps = [list() for _ in range(len(words))] if not self.use_lemma else None # todo
@@ -127,14 +147,16 @@ class SRLLSTM:
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]),
                                lookup_batch(self.x_pe, pwords[i]),
+                               lookup_batch(self.x_rse, rswords[i]),
                                lookup_batch(self.pred_flag, pred_flags[i]),
                                lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i]]) for i in
                   range(len(words))] if self.no_pos  else \
             [concatenate([lookup_batch(self.x_re, words[i]),
-                               lookup_batch(self.x_pe, pwords[i]),
-                               lookup_batch(self.pred_flag, pred_flags[i]),
-                               lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
-                               lookup_batch(self.x_pos, pos[i]) if self.use_pos else pos_cnn_reps[i]]) for i in
+                                lookup_batch(self.x_pe, pwords[i]),
+                                lookup_batch(self.x_rse, rswords[i]),
+                                lookup_batch(self.pred_flag, pred_flags[i]),
+                                lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
+                                lookup_batch(self.x_pos, pos[i]) if self.use_pos else pos_cnn_reps[i]]) for i in
                   range(len(words))]
 
 
@@ -144,8 +166,8 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
-        bilstms, ul_cnn_reps = self.rnn(words, pwords, pos, lemmas, pred_flags, chars, pred_chars, pred_index)
+        words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
+        bilstms, ul_cnn_reps = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars, pred_chars, pred_index)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         if not self.use_lemma:
             ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
