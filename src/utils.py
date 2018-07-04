@@ -71,7 +71,6 @@ def read_conll(fh):
     sentences = codecs.open(fh, 'r').read().strip().split('\n\n')
     read = 0
     for i,sentence in enumerate(sentences):
-        print i
         words = []
         predicates = list()
         entries = sentence.strip().split('\n')
@@ -91,7 +90,6 @@ def read_conll(fh):
                            is_pred))
         read += 1
         yield ConllStruct(words, predicates)
-    print read, 'sentences read.'
 
 def write_conll(fn, conll_structs):
     with codecs.open(fn, 'w') as fh:
