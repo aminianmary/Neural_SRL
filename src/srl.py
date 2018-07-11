@@ -94,7 +94,7 @@ class SRLLSTM:
         self.u_rs = self.model.add_lookup_parameters((len(self.pred_words) + 3, self.rsdim))
         for pred_word, i in self.pred_words.iteritems():
             if pred_word in self.x_rse_dict:
-                self.u_rs.init_row(i, self.relsource_embedding.get[pred_word])
+                self.u_rs.init_row(i, self.relsource_embedding[pred_word])
             else:
                 self.u_rs.init_row(i, self.norse)
         self.u_rs.init_row(0, self.norse)
