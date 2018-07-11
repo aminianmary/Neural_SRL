@@ -52,7 +52,7 @@ class SRLLSTM:
             self.x_pe.init_row(i, self.external_embedding[word])
         self.x_pe.init_row(0,self.noextrn)
         self.x_pe.init_row(1,self.noextrn)
-        self.x_pe.set_updated(options.update_externals)
+        self.x_pe.set_updated(False)
         print 'Load external embedding. Vector dimensions', self.edim
 
         #related source word embeddings space (relsource_embedings)
