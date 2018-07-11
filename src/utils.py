@@ -39,7 +39,8 @@ def vocab(sentences, min_count=2):
     wordsCount = Counter()
     posCount = Counter()
     semRelCount = Counter()
-    lemma_count = Counter()
+    lemmaCount = Counter()
+    predwordsCount = Counter()
     chars = set()
 
     for sentence in sentences:
@@ -49,7 +50,8 @@ def vocab(sentences, min_count=2):
             if node.predicateList == None:
                 continue
             if node.is_pred:
-                lemma_count.update([node.lemma])
+                lemmaCount.update([node.lemma])
+                predwordsCount.update([node.norm])
             for pred in node.predicateList.values():
                 if pred!='?':
                     semRelCount.update([pred])
@@ -61,10 +63,15 @@ def vocab(sentences, min_count=2):
         if wordsCount[w] >= min_count:
             words.add(w)
     lemmas = set()
-    for l in lemma_count.keys():
-        if lemma_count[l] >= min_count:
+    for l in lemmaCount.keys():
+        if lemmaCount[l] >= min_count:
             lemmas.add(l)
-    return (list(words), list(lemmas),
+
+    predwords = set()
+    for l in predwordsCount.keys():
+        if predwordsCount[l] >= min_count:
+            predwords.add(l)
+    return (list(words), list(predwords), list(lemmas),
             list(posCount), list(semRelCount.keys()), list(chars))
 
 def read_conll(fh):
@@ -143,7 +150,6 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_b
     pwords = np.array([np.array(
         [model.x_pe_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD_index for i in
          range(len(batch))]) for j in range(cur_len)])
-
     rswords = np.array([np.array(
         [model.x_rse_dict.get(batch[i][j].norm, 0) if j < len(batch[i]) else model.PAD_index for i in
          range(len(batch))]) for j in range(cur_len)])
@@ -181,9 +187,11 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_b
     pred_flags = np.array([np.array([(1 if pred_ids[i][1] == j else 0)
                                      if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
+    pred_rswords = np.array([model.pred_words.get(batch[i][pred_ids[i][1]].norm, 0) for i in range(len(batch))])
     pred_index = np.array([pred_ids[i][1] for i in range(len(batch))])
     masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks))
+    mini_batches.append((words, pwords, rswords, lemmas, pos, roles, chars,
+                         pred_chars, pred_flags, pred_lemmas, pred_index, pred_rswords, masks))
 
 def get_scores(fp):
     labeled_f = 0

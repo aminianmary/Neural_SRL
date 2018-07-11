@@ -5,7 +5,7 @@ import numpy as np
 
 
 class SRLLSTM:
-    def __init__(self, words, lemmas, pos, roles, chars, options):
+    def __init__(self, words, predwords, lemmas, pos, roles, chars, options):
         self.model = Model()
         self.use_lemma = options.lemma
         self.use_pos= options.pos
@@ -19,6 +19,7 @@ class SRLLSTM:
         self.NO_LEMMA_index = 2
         self.words = {word: ind + 2 for ind,word in enumerate(words)} #0 is reserved for UNK and 1 is reserved for PAD
         self.pred_lemmas = {pl: ind + 3 for ind,pl in enumerate(lemmas)} #0 for UNK, 1 for PAD, 2 for NO_LEMMA
+        self.pred_words = {pw: ind + 3 for ind,pw in enumerate(predwords)} #0 for UNK, 1 for PAD, 2 for NO_LEMMA
         self.pos = {p: ind + 2 for ind, p in enumerate(pos)} #0 for UNK, 1 for PAD
         self.ipos = ['<UNK>', '<PAD>'] + pos
         self.roles = {r: ind for ind, r in enumerate(roles)}
@@ -90,6 +91,16 @@ class SRLLSTM:
             if (not self.use_lemma or not self.use_pos) else None
         self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l)) \
             if self.use_lemma else None
+        self.u_rs = self.model.add_lookup_parameters((len(self.pred_words) + 3, self.rsdim))
+        for pred_word, i in self.pred_words.iteritems():
+            if pred_word in self.x_rse_dict:
+                self.u_rs.init_row(i, self.relsource_embedding.get[pred_word])
+            else:
+                self.u_rs.init_row(i, self.norse)
+        self.u_rs.init_row(0, self.norse)
+        self.u_rs.init_row(1, self.norse)
+        self.u_rs.set_updated(False)
+
         self.u_l_char_lstm = BiRNNBuilder(1, options.d_c, self.d_prime_l, self.model, VanillaLSTMBuilder) \
             if not self.use_lemma else None
         self.x_re = self.model.add_lookup_parameters((len(self.words) + 2, self.d_w))
@@ -98,7 +109,7 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
-        self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l))
+        self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l + self.rsdim))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -166,7 +177,7 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
+        words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, pred_rswords, masks= minibatch
         bilstms, ul_cnn_reps = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars, pred_chars, pred_index)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         if not self.use_lemma:
@@ -176,8 +187,9 @@ class SRLLSTM:
         for sen in range(roles.shape[0]):
             v_p = bilstms[pred_index[sen]][sen]
             u_l = self.u_l[pred_lemmas[sen]] if self.use_lemma else reshape(ul_cnn_reps[sen], (self.d_prime_l,), 1)
+            u_rs=  self.u_rs[pred_rswords[sen]]
             W = transpose(concatenate_cols(
-                [rectify(self.U.expr() * (concatenate([u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
+                [rectify(self.U.expr() * (concatenate([u_rs ,u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
 
             for arg_index in range(roles.shape[1]):
                 if masks[sen][arg_index] != 0:
@@ -233,7 +245,7 @@ class SRLLSTM:
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
                                       self.Predict(dev_path, options.sen_cut))
-                    os.system('perl ~/direct_transfer/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
+                    os.system('perl ~/Neural_SRL/src/utils/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
                     labeled_f, unlabeled_f = get_scores(

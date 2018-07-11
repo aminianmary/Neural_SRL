@@ -61,13 +61,13 @@ if __name__ == '__main__':
         print 'Preparing vocab'
         print options
         train_data = list(utils.read_conll(options.conll_train))
-        words, lemmas, pos, roles, chars = utils.vocab(train_data)
+        words, predwords, lemmas, pos, roles, chars = utils.vocab(train_data)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
             pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
         print 'Finished collecting vocab'
 
         print 'Initializing blstm srl:'
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, options)
+        parser = SRLLSTM(words, predwords, lemmas, pos, roles, chars, options)
         best_f_score = 0.0
 
         max_len = max([len(d) for d in train_data])
