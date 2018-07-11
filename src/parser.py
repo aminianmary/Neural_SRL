@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_option("--pos", action="store_true", dest="pos", default=False, help='Use pos in model')
     parser.add_option("--no_pos", action="store_true", dest="no_pos", default=False,
                       help='pos is not modeled by embeddings or character models')
-
+    parser.add_option("--update_externals", action="store_true", dest="update_externals", default=False, help='Update external embeddings')
 
 
     (options, args) = parser.parse_args()

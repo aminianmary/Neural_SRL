@@ -52,7 +52,7 @@ class SRLLSTM:
             self.x_pe.init_row(i, self.external_embedding[word])
         self.x_pe.init_row(0,self.noextrn)
         self.x_pe.init_row(1,self.noextrn)
-        self.x_pe.set_updated(False)
+        self.x_pe.set_updated(options.update_externals)
         print 'Load external embedding. Vector dimensions', self.edim
 
         #related source word embeddings space (relsource_embedings)
@@ -71,7 +71,7 @@ class SRLLSTM:
             self.x_rse.init_row(i, self.relsource_embedding[word])
         self.x_rse.init_row(0, self.norse)
         self.x_rse.init_row(1, self.norse)
-        self.x_rse.set_updated(False)
+        self.x_rse.set_updated(options.update_externals)
         print 'Load relsource embedding. Vector dimensions', self.rsdim
 
         self.inp_dim = self.d_w +\
@@ -99,7 +99,7 @@ class SRLLSTM:
                 self.u_rs.init_row(i, self.norse)
         self.u_rs.init_row(0, self.norse)
         self.u_rs.init_row(1, self.norse)
-        self.u_rs.set_updated(False)
+        self.u_rs.set_updated(options.update_externals)
 
         self.u_l_char_lstm = BiRNNBuilder(1, options.d_c, self.d_prime_l, self.model, VanillaLSTMBuilder) \
             if not self.use_lemma else None
