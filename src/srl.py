@@ -91,10 +91,10 @@ class SRLLSTM:
             if (not self.use_lemma or not self.use_pos) else None
         self.u_l = self.model.add_lookup_parameters((len(self.pred_lemmas) + 3, self.d_prime_l)) \
             if self.use_lemma else None
-        self.u_rs = self.model.add_lookup_parameters((len(self.pred_words) + 3, self.rsdim))
-        for pred_word, i in self.pred_words.iteritems():
-            if pred_word in self.x_rse_dict:
-                self.u_rs.init_row(i, self.relsource_embedding[pred_word])
+        self.u_rs = self.model.add_lookup_parameters((len(self.words) + 3, self.rsdim))
+        for word, i in self.words.iteritems():
+            if word in self.x_rse_dict:
+                self.u_rs.init_row(i, self.relsource_embedding[word])
             else:
                 self.u_rs.init_row(i, self.norse)
         self.u_rs.init_row(0, self.norse)
@@ -109,7 +109,7 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
-        self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l + self.rsdim))
+        self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l + self.rsdim + self.rsdim))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -177,7 +177,7 @@ class SRLLSTM:
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
-        words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, pred_rswords, masks= minibatch
+        words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
         bilstms, ul_cnn_reps = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars, pred_chars, pred_index)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         if not self.use_lemma:
@@ -187,12 +187,14 @@ class SRLLSTM:
         for sen in range(roles.shape[0]):
             v_p = bilstms[pred_index[sen]][sen]
             u_l = self.u_l[pred_lemmas[sen]] if self.use_lemma else reshape(ul_cnn_reps[sen], (self.d_prime_l,), 1)
-            u_rs=  self.u_rs[pred_rswords[sen]]
-            W = transpose(concatenate_cols(
-                [rectify(self.U.expr() * (concatenate([u_rs ,u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
+            u_rs_predicate=  self.u_rs[words[pred_index[sen]][sen]]
 
             for arg_index in range(roles.shape[1]):
                 if masks[sen][arg_index] != 0:
+                    u_rs_argument = self.u_rs[words[arg_index][sen]]
+                    W = transpose(concatenate_cols(
+                        [rectify(self.U.expr() * (concatenate([u_rs_predicate, u_l, u_rs_argument,self.v_r[role]]))) for role in
+                         xrange(len(self.roles))]))
                     v_i = bilstms[arg_index][sen]
                     scores = W * concatenate([v_i, v_p])
                     if is_train:
