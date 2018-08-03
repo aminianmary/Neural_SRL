@@ -108,7 +108,8 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
-        self.U = self.model.add_parameters((self.d_h * 4)+ (self.rsdim*2), self.d_r + self.d_prime_l)
+        
+        self.U = self.model.add_parameters(self.d_h * 4+ self.rsdim * 2, self.d_r + self.d_prime_l)
 
     def Save(self, filename):
         self.model.save(filename)
