@@ -78,7 +78,6 @@ class SRLLSTM:
                        (self.d_l if self.use_lemma else self.d_cw)+ \
                        (0 if self.no_pos else (self.d_pos if self.use_pos else self.d_pw))+ \
                        (self.edim if self.external_embedding is not None else 0) + \
-                       (self.rsdim if self.relsource_embedding is not None else 0) + \
                        (1 if self.region else 0)  # 1 for predicate indicator
 
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
@@ -158,13 +157,11 @@ class SRLLSTM:
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]),
                                lookup_batch(self.x_pe, pwords[i]),
-                               lookup_batch(self.x_rse, rswords[i]),
                                lookup_batch(self.pred_flag, pred_flags[i]),
                                lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i]]) for i in
                   range(len(words))] if self.no_pos  else \
             [concatenate([lookup_batch(self.x_re, words[i]),
                                 lookup_batch(self.x_pe, pwords[i]),
-                                lookup_batch(self.x_rse, rswords[i]),
                                 lookup_batch(self.pred_flag, pred_flags[i]),
                                 lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
                                 lookup_batch(self.x_pos, pos[i]) if self.use_pos else pos_cnn_reps[i]]) for i in
