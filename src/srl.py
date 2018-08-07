@@ -78,6 +78,7 @@ class SRLLSTM:
                        (self.d_l if self.use_lemma else self.d_cw)+ \
                        (0 if self.no_pos else (self.d_pos if self.use_pos else self.d_pw))+ \
                        (self.edim if self.external_embedding is not None else 0) + \
+                       (self.rsdim if self.relsource_embedding is not None else 0) + \
                        (1 if self.region else 0)  # 1 for predicate indicator
 
         self.deep_lstms = BiRNNBuilder(self.k, self.inp_dim, 2*self.d_h, self.model, VanillaLSTMBuilder)
@@ -108,7 +109,7 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
-        self.U = self.model.add_parameters((self.d_h * 4+ self.rsdim* 2, self.d_r + self.d_prime_l))
+        self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.rsdim))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -157,11 +158,13 @@ class SRLLSTM:
 
         inputs = [concatenate([lookup_batch(self.x_re, words[i]),
                                lookup_batch(self.x_pe, pwords[i]),
+                               lookup_batch(self.x_rse, rswords[i]),
                                lookup_batch(self.pred_flag, pred_flags[i]),
                                lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i]]) for i in
                   range(len(words))] if self.no_pos  else \
             [concatenate([lookup_batch(self.x_re, words[i]),
                                 lookup_batch(self.x_pe, pwords[i]),
+                                lookup_batch(self.x_rse, rswords[i]),
                                 lookup_batch(self.pred_flag, pred_flags[i]),
                                 lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
                                 lookup_batch(self.x_pos, pos[i]) if self.use_pos else pos_cnn_reps[i]]) for i in
@@ -187,13 +190,13 @@ class SRLLSTM:
             u_rs_predicate=  self.u_rs[words[pred_index[sen]][sen]]
 
             W = transpose(concatenate_cols(
-                [rectify(self.U.expr() * (concatenate([u_l, self.v_r[role]]))) for role in xrange(len(self.roles))]))
+                [rectify(self.U.expr() * (concatenate([u_rs_predicate, self.v_r[role]]))) for role in xrange(len(self.roles))]))
 
             for arg_index in range(roles.shape[1]):
                 if masks[sen][arg_index] != 0:
                     u_rs_argument = self.u_rs[words[arg_index][sen]]
                     v_i = bilstms[arg_index][sen]
-                    scores = W * concatenate([v_i, v_p, u_rs_predicate, u_rs_argument])
+                    scores = W * concatenate([v_i, v_p])
                     if is_train:
                         gold_role = roles[sen][arg_index]
                         err = pickneglogsoftmax(scores, gold_role) * masks[sen][arg_index]
