@@ -109,7 +109,7 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
-        self.U = self.model.add_parameters((self.d_h * 4 + self.edim, self.d_r + self.rsdim))
+        self.U = self.model.add_parameters((self.d_h * 4 + self.edim + self.d_w, self.d_r + self.rsdim))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -164,7 +164,9 @@ class SRLLSTM:
             for i in range(words.shape[0]):
                 pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
-        inputs_bow_encoder = [lookup_batch(self.x_pe, pwords[i]) for i in range(len(words))]
+        inputs_bow = [concatenate([lookup_batch(self.x_re, words[i]),
+                                   lookup_batch(self.x_pe, pwords[i]) ]) for i in range(len(words))]
+
         inputs = [concatenate([lookup_batch(self.x_re, words[i]),
                                lookup_batch(self.x_pe, pwords[i]),
                                lookup_batch(self.x_rse, rswords[i]),
@@ -181,19 +183,18 @@ class SRLLSTM:
 
 
         rnn_res = self.transduce(self.deep_lstms, inputs)
-        return rnn_res, ul_cnn_reps, inputs_bow_encoder
-
+        return rnn_res, ul_cnn_reps, inputs_bow
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
         words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
-        bilstms, ul_cnn_reps, inputs_bow_encoder = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars,
+        bilstms, ul_cnn_reps, inputs_bow = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars,
                                                             pred_chars, pred_index)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         if not self.use_lemma:
             ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
         roles, masks = roles.T, masks.T
-        bow_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in inputs_bow_encoder]
+        bow_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in inputs_bow]
 
         for sen in range(roles.shape[0]):
             v_p = bilstms[pred_index[sen]][sen]
