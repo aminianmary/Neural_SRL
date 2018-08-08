@@ -1,6 +1,6 @@
 from dynet import *
 from utils import read_conll, get_batches, get_scores, write_conll
-import time, random, os,math
+import time, random, os, math
 import numpy as np
 
 
@@ -109,7 +109,7 @@ class SRLLSTM:
         self.pred_flag.init_row(0, [0])
         self.pred_flag.init_row(0, [1])
         self.pred_flag.set_updated(False)
-        self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.rsdim))
+        self.U = self.model.add_parameters((self.d_h * 4 + self.edim, self.d_r + self.rsdim))
 
     def Save(self, filename):
         self.model.save(filename)
@@ -123,6 +123,14 @@ class SRLLSTM:
             fs, bs = f.transduce(inputs), b.transduce(reversed(inputs))
             inputs = [concatenate([f, b]) for f, b in zip(fs, reversed(bs))]
         return inputs
+
+    def get_bow(self, target_index, words, sen, word_embeddings):
+        embeddding_values = [None] * len(words)
+        for i in xrange(len(words)):
+            constant = (1.0 / (math.fabs(target_index - i) + 1)) if words[i][sen] != 1 else 0
+            embeddding_values[i] = constant * word_embeddings[i][sen]
+        final_e = sum_batches(concatenate_to_batch(embeddding_values))
+        return final_e
 
     def rnn(self, words, pwords, rswords, pos, lemmas, pred_flags, chars, pred_chars, pred_index):
         cembed = None if (self.no_pos or self.use_pos) else [lookup_batch(self.ce, c) for c in chars]
@@ -156,6 +164,7 @@ class SRLLSTM:
             for i in range(words.shape[0]):
                 pos_cnn_reps[i] = pick_batch(pos_crnn, [i * words.shape[1] + j for j in range(words.shape[1])], 1)
 
+        inputs_bow_encoder = [lookup_batch(self.x_pe, pwords[i]) for i in range(len(words))]
         inputs = [concatenate([lookup_batch(self.x_re, words[i]),
                                lookup_batch(self.x_pe, pwords[i]),
                                lookup_batch(self.x_rse, rswords[i]),
@@ -163,7 +172,7 @@ class SRLLSTM:
                                lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i]]) for i in
                   range(len(words))] if self.no_pos  else \
             [concatenate([lookup_batch(self.x_re, words[i]),
-                                lookup_batch(self.x_pe, pwords[i]),
+                          lookup_batch(self.x_pe, pwords[i]),
                                 lookup_batch(self.x_rse, rswords[i]),
                                 lookup_batch(self.pred_flag, pred_flags[i]),
                                 lookup_batch(self.x_le, lemmas[i]) if self.use_lemma else lem_cnn_reps[i],
@@ -172,17 +181,19 @@ class SRLLSTM:
 
 
         rnn_res = self.transduce(self.deep_lstms, inputs)
-        return rnn_res, ul_cnn_reps
+        return rnn_res, ul_cnn_reps, inputs_bow_encoder
 
 
     def buildGraph(self, minibatch, is_train):
         outputs = []
         words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks= minibatch
-        bilstms, ul_cnn_reps = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars, pred_chars, pred_index)
+        bilstms, ul_cnn_reps, inputs_bow_encoder = self.rnn(words, pwords, rswords, pos, lemmas, pred_flags, chars,
+                                                            pred_chars, pred_index)
         bilstms = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in bilstms]
         if not self.use_lemma:
             ul_cnn_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in ul_cnn_reps]
         roles, masks = roles.T, masks.T
+        bow_reps = [transpose(reshape(b, (b.dim()[0][0], b.dim()[1]))) for b in inputs_bow_encoder]
 
         for sen in range(roles.shape[0]):
             v_p = bilstms[pred_index[sen]][sen]
@@ -196,7 +207,9 @@ class SRLLSTM:
                 if masks[sen][arg_index] != 0:
                     u_rs_argument = self.u_rs[words[arg_index][sen]]
                     v_i = bilstms[arg_index][sen]
-                    scores = W * concatenate([v_i, v_p])
+                    #working to get bow embeddings
+                    v_bow = self.get_bow(arg_index, words, sen, bow_reps)
+                    scores = W * concatenate([v_i, v_p, v_bow])
                     if is_train:
                         gold_role = roles[sen][arg_index]
                         err = pickneglogsoftmax(scores, gold_role) * masks[sen][arg_index]
