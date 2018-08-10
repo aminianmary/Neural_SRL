@@ -240,10 +240,9 @@ class SRLLSTM:
             errs, sen_num = [], 0
             iters+=1
 
-            if (b+1)%part_size==0:
+            if dev_path != None:
                 part+=1
-
-                if dev_path != None:
+                if (b + 1) % part_size == 0:
                     start = time.time()
                     write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
                                       self.Predict(dev_path, options.sen_cut))
@@ -259,6 +258,8 @@ class SRLLSTM:
                         self.Save(os.path.join(options.outdir, options.model))
                         best_f_score = float(labeled_f)
                         best_part = part
+            else:
+                self.Save(os.path.join(options.outdir, options.model))
 
         print 'best part on this epoch: '+ str(best_part)
         return best_f_score
