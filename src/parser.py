@@ -63,7 +63,7 @@ if __name__ == '__main__':
         train_data = list(utils.read_conll(options.conll_train))
         words, predwords, lemmas, pos, roles, chars = utils.vocab(train_data)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
-            pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
+            pickle.dump((words, predwords, lemmas, pos, roles, chars, options), paramsfp)
         print 'Finished collecting vocab'
 
         print 'Initializing blstm srl:'
@@ -88,9 +88,9 @@ if __name__ == '__main__':
 
     if options.input and options.output:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
-            words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+            words, predwords, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser = SRLLSTM(words, predwords, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         pred = list(parser.Predict(options.input, options.sen_cut))
@@ -100,9 +100,9 @@ if __name__ == '__main__':
 
     if options.inputdir and options.outputdir:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
-            words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+            words,predwords, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
         stored_opt.external_embedding = options.external_embedding
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser = SRLLSTM(words,predwords, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.outdir, options.model))
         ts = time.time()
         for dir, subdir, files in os.walk(options.inputdir):
