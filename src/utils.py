@@ -196,3 +196,29 @@ def get_scores(fp):
                 spl = line.strip().split(' ')
                 unlabeled_f = spl[len(spl) - 1]
     return (labeled_f, unlabeled_f)
+
+def replace_unk_projections (output, gold, replaced_file):
+    output_lines = codecs.open(output,'r').strip().split('\n')
+    gold_lines = codecs.open(gold,'r').strip().split('\n')
+
+    if len(output_lines)!= len(gold_lines):
+        print 'number of lines does not match between the system output and gold file!'
+
+    with codecs.open(replaced_file,'w') as writer:
+        for i in xrange(len(output_lines)):
+            if output_lines[i]!= '\n':
+                o_fields = output_lines[i].split()[12:]
+                g_fileds = gold_lines[i].split()[12:]
+
+                for j in xrange(len(o_fields)):
+                    if o_fields[j] == '?':
+                        o_fields[j]= g_fileds[j]
+                writer.write('\t'.join(o_fields)+'\n')
+            else:
+                writer.write('\n')
+        writer.flush()
+        writer.close()
+
+
+
+        spl = o_line

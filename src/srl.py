@@ -1,5 +1,5 @@
 from dynet import *
-from utils import read_conll, get_batches, get_scores, write_conll
+from utils import read_conll, get_batches, get_scores, write_conll, replace_unk_projections
 import time, random, os,math
 import numpy as np
 
@@ -184,8 +184,10 @@ class SRLLSTM:
         start = time.time()
         errs,loss,iters,sen_num = [],0,0,0
         dev_path = options.conll_dev
+        silver_dev = options.silver_dev
 
-        part_size = max(len(mini_batches)/5,1)
+        p = options.num_parts
+        part_size = max(len(mini_batches)/p,1)
         part = 0
         best_part = 0
 
@@ -209,9 +211,11 @@ class SRLLSTM:
 
                 if dev_path != None:
                     start = time.time()
-                    write_conll(os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt',
-                                      self.Predict(dev_path, options.sen_cut))
-                    os.system('perl ~/coling/eval.pl -g ' + dev_path + ' -s ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt' + ' > ' + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
+                    sys_output_file = os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt'
+                    write_conll(sys_output_file, self.Predict(dev_path, options.sen_cut))
+
+                    dev = replace_unk_projections(dev_path, sys_output_file, dev_path+'.silver') if silver_dev else dev_path
+                    os.system('perl ~/coling/eval.pl -g ' + dev + ' -s ' + sys_output_file + ' > ' + sys_output_file + '.eval')
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
                     labeled_f, unlabeled_f = get_scores(
