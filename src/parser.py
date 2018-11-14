@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser.add_option("--pos", action="store_true", dest="pos", default=False, help='Use pos in model')
     parser.add_option("--no_pos", action="store_true", dest="no_pos", default=False,
                       help='pos is not modeled by embeddings or character models')
-    parser.add_option("--num_parts", type="int", dest="p", default=1)
+    parser.add_option("--num_parts", type="int", dest="num_parts", default=1)
     parser.add_option("--silver_dev", action="store_true", dest="silver_dev", default=False, help='Use silver development data')
 
 
