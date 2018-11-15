@@ -30,7 +30,7 @@ class ConllEntry:
                       self.parent_id,
                       self.parent_id, self.relation, self.relation,
                       'Y' if self.is_pred == True else '_',
-                      self.sense]
+                      self.sense if self.sense != '?' else '_']
         for p in self.predicateList.values():
             entry_list.append(p)
         return '\t'.join(entry_list)
@@ -188,9 +188,10 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_b
                                      if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
     pred_index = np.array([pred_ids[i][1] for i in range(len(batch))])
-    masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    mini_batches.append((words, pwords, rswords, lemmas, pos, roles, chars,
-                         pred_chars, pred_flags, pred_lemmas, pred_index, masks))
+    # masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
+    masks = np.array([np.array([1 if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
+
+    mini_batches.append((words, pwords, rswords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks))
 
 def get_scores(fp):
     labeled_f = 0
@@ -206,3 +207,24 @@ def get_scores(fp):
                 spl = line.strip().split(' ')
                 unlabeled_f = spl[len(spl) - 1]
     return (labeled_f, unlabeled_f)
+
+def replace_unk_projections (output, gold, replaced_file):
+    output_lines = codecs.open(output,'r').read().strip().split('\n')
+    gold_lines = codecs.open(gold,'r').read().strip().split('\n')
+    if len(output_lines)!= len(gold_lines):
+        print 'number of lines does not match between the system output and gold file!'
+
+    with codecs.open(replaced_file,'w') as writer:
+        for i in xrange(len(output_lines)):
+            if output_lines[i]!= '\n':
+                o_fields = output_lines[i].split()[12:]
+                g_fileds = gold_lines[i].split()[12:]
+                for j in xrange(len(o_fields)):
+                    if o_fields[j] == '?':
+                        o_fields[j]= g_fileds[j]
+                writer.write('\t'.join(output_lines[i].split()[:12]) + '\t' + '\t'.join(o_fields) + '\n')
+            else:
+                writer.write('\n')
+        writer.flush()
+        writer.close()
+    return replaced_file
