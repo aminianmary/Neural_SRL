@@ -215,7 +215,8 @@ class SRLLSTM:
                     write_conll(sys_output_file, self.Predict(dev_path, options.sen_cut))
 
                     dev = replace_unk_projections(dev_path, sys_output_file, dev_path+'.silver') if silver_dev else dev_path
-                    os.system('perl ~/coling/eval.pl -g ' + dev + ' -s ' + sys_output_file + ' > ' + sys_output_file + '.eval')
+                    os.system('perl /Users/monadiab/Neural_SRL/eval.pl -g ' + dev + ' -s ' + sys_output_file + ' > '
+                              + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
                     labeled_f, unlabeled_f = get_scores(
