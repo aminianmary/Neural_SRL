@@ -249,7 +249,9 @@ class SRLLSTM:
                     start = time.time()
                     sys_output_file = os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.txt'
                     write_conll(sys_output_file, self.Predict(dev_path, options.sen_cut))
-                    dev = replace_unk_projections(dev_path, sys_output_file, dev_path + '.silver') if silver_dev else dev_path
+
+                    silver_dev_file = options.outdir + 'silver_dev'
+                    dev = replace_unk_projections(dev_path, sys_output_file, silver_dev_file) if silver_dev else dev_path
                     os.system('perl /Users/monadiab/Neural_SRL/eval.pl -g ' + dev + ' -s ' + sys_output_file + ' > '
                               + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
 
