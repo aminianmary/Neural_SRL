@@ -179,8 +179,7 @@ def add_to_minibatch(batch, pred_ids, cur_c_len, cur_len, cur_pred_c_len, mini_b
                                      if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
     pred_lemmas = np.array([model.pred_lemmas.get(batch[i][pred_ids[i][1]].lemma, 0) for i in range(len(batch))])
     pred_index = np.array([pred_ids[i][1] for i in range(len(batch))])
-    #masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
-    masks = np.array([np.array([1 if j < len(batch[i]) else 0 for i in range(len(batch))]) for j in range(cur_len)])
+    masks = np.array([np.array([1 if j < len(batch[i]) and batch[i][j].predicateList[pred_ids[i][0]]!='?' else 0 for i in range(len(batch))]) for j in range(cur_len)])
     mini_batches.append((words, pwords, lemmas, pos, roles, chars, pred_chars, pred_flags, pred_lemmas, pred_index, masks))
 
 def get_scores(fp):
