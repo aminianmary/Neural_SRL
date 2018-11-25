@@ -78,6 +78,7 @@ if __name__ == '__main__':
             buckets[len(d) - min_len - 1].append(d)
         buckets = [x for x in buckets if x != []]
 
+        best_f_score = 0.0
         for epoch in xrange(options.epochs):
             print 'Starting epoch', epoch
             print 'best F-score before starting the epoch: ' + str(best_f_score)
