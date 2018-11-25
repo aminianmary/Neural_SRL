@@ -107,7 +107,8 @@ if __name__ == '__main__':
     if options.conll_train and options.pret_dir:
         with open(os.path.join(options.pret_dir, options.params), 'r') as paramsfp:
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
-
+        with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
+            pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.pret_dir, options.model))
