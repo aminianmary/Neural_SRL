@@ -77,6 +77,7 @@ def read_conll(fh):
         entries = sentence.strip().split('\n')
         for entry in entries:
             spl = entry.split('\t')
+            print len(spl)
             predicateList = dict()
             is_pred = False
             if spl[12] == 'Y':
@@ -197,7 +198,7 @@ def get_scores(fp):
                 unlabeled_f = spl[len(spl) - 1]
     return (labeled_f, unlabeled_f)
 
-def replace_unk_projections (output, gold, replaced_file):
+def replace_unk_with_system_output (output, gold, replaced_file):
     output_lines = codecs.open(output,'r').read().strip().split('\n')
     gold_lines = codecs.open(gold,'r').read().strip().split('\n')
 
@@ -206,7 +207,7 @@ def replace_unk_projections (output, gold, replaced_file):
 
     with codecs.open(replaced_file,'w') as writer:
         for i in xrange(len(output_lines)):
-            if output_lines[i]!= '\n':
+            if output_lines[i]!= '':
                 o_fields = output_lines[i].split()[12:]
                 g_fileds = gold_lines[i].split()[12:]
 
@@ -214,6 +215,25 @@ def replace_unk_projections (output, gold, replaced_file):
                     if o_fields[j] == '?':
                         o_fields[j]= g_fileds[j]
                 writer.write('\t'.join(output_lines[i].split()[:12])+ '\t' + '\t'.join(o_fields)+ '\n')
+            else:
+                writer.write('\n')
+        writer.flush()
+        writer.close()
+    return replaced_file
+
+def replace_unk_with_null (output):
+    output_lines = codecs.open(output,'r').read().strip().split('\n')
+    replaced_file = output +'.unk_replaced_with_null'
+
+    with codecs.open(replaced_file,'w') as writer:
+        for i in xrange(len(output_lines)):
+            l = output_lines[i]
+            if l != '':
+                o_fields = l .split()[12:]
+                for j in xrange(len(o_fields)):
+                    if o_fields[j] == '?':
+                        o_fields[j]= '_'
+                writer.write('\t'.join(l.split()[:12])+ '\t' + '\t'.join(o_fields)+ '\n')
             else:
                 writer.write('\n')
         writer.flush()

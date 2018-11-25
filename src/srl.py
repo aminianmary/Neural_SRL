@@ -1,5 +1,5 @@
 from dynet import *
-from utils import read_conll, get_batches, get_scores, write_conll, replace_unk_projections
+from utils import read_conll, get_batches, get_scores, write_conll, replace_unk_with_system_output, replace_unk_with_null
 import time, random, os,math
 import numpy as np
 
@@ -211,12 +211,17 @@ class SRLLSTM:
 
                 if dev_path != None:
                     start = time.time()
+                    #prediction
                     sys_output_file = os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part)+ '.txt'
-                    write_conll(sys_output_file, self.Predict(dev_path, options.sen_cut))
-                    silver_dev_file = options.outdir + 'silver_dev'
-                    dev = replace_unk_projections(dev_path, sys_output_file, silver_dev_file) if silver_dev else dev_path
-                    os.system('perl /Users/monadiab/Neural_SRL/eval.pl -g ' + dev + ' -s ' + sys_output_file + ' > '
+                    dev_prediction = replace_unk_with_null(dev_path) if silver_dev else dev_path
+                    write_conll(sys_output_file, self.Predict(dev_prediction, options.sen_cut))
+
+                    #evaluation
+                    silver_dev_file = options.outdir + '/silver_dev_'+str(epoch + 1)
+                    dev_evaluation = replace_unk_with_system_output(dev_path, sys_output_file, silver_dev_file) if silver_dev else dev_path
+                    os.system('perl /Users/monadiab/Neural_SRL/eval.pl -g ' + dev_evaluation + ' -s ' + sys_output_file + ' > '
                               + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
+
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
 
                     labeled_f, unlabeled_f = get_scores(

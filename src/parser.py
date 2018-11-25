@@ -39,6 +39,7 @@ if __name__ == '__main__':
     parser.add_option("--sen_cut", type="int", dest="sen_cut", default=100)
     parser.add_option("--epochs", type="int", dest="epochs", default=30)
     parser.add_option("--outdir", type="string", dest="outdir", default="results")
+    parser.add_option("--pret_dir", type="string", dest="pret_dir", help = 'Pretrained model for loading', default="results")
     parser.add_option("--dynet-autobatch", type="int", default=1)
     parser.add_option("--dynet-mem", type="int", default=10240)
     parser.add_option("--save_epoch", action="store_true", dest="save_epoch", default=False, help='Save each epoch.')
@@ -100,6 +101,31 @@ if __name__ == '__main__':
         te = time.time()
         utils.write_conll(options.output, pred)
         print 'Finished predicting test', te - ts
+
+    if options.conll_train and options.pret_dir:
+        with open(os.path.join(options.pret_dir, options.params), 'r') as paramsfp:
+            words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+        stored_opt.external_embedding = options.external_embedding
+        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser.Load(os.path.join(options.pret_dir, options.model))
+
+        max_len = max([len(d) for d in train_data])
+        min_len = min([len(d) for d in train_data])
+        buckets = [list() for i in range(min_len, max_len)]
+        for d in train_data:
+            buckets[len(d) - min_len - 1].append(d)
+        buckets = [x for x in buckets if x != []]
+
+        for epoch in xrange(options.epochs):
+            print 'Starting epoch', epoch
+            print 'best F-score before starting the epoch: ' + str(best_f_score)
+            best_f_score = parser.Train(utils.get_batches(buckets, parser, True, options.sen_cut),
+                                        epoch, best_f_score, options)
+            print 'best F-score after finishing the epoch: ' + str(best_f_score)
+
+        if options.conll_dev == None:
+            parser.Save(os.path.join(options.outdir, options.model))
+
 
     if options.inputdir and options.outputdir:
         with open(os.path.join(options.outdir, options.params), 'r') as paramsfp:
