@@ -52,6 +52,8 @@ if __name__ == '__main__':
                       help='pos is not modeled by embeddings or character models')
     parser.add_option("--num_parts", type="int", dest="num_parts", default=1)
     parser.add_option("--silver_dev", action="store_true", dest="silver_dev", default=False, help='Use silver development data')
+    parser.add_option("--update_external", action="store_true", dest="update_external", default=False, help='Update external embeddings')
+
 
 
 
