@@ -63,7 +63,7 @@ if __name__ == '__main__':
     print 'Using external embedding:', options.external_embedding
     from srl import SRLLSTM
 
-    if options.conll_train:
+    if options.conll_train and not options.pret_dir:
         print 'Preparing vocab'
         print options
         train_data = list(utils.read_conll(options.conll_train))
@@ -107,6 +107,7 @@ if __name__ == '__main__':
     if options.conll_train and options.pret_dir:
         with open(os.path.join(options.pret_dir, options.params), 'r') as paramsfp:
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+
         stored_opt.external_embedding = options.external_embedding
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.pret_dir, options.model))
