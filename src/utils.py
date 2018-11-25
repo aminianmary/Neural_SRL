@@ -77,7 +77,7 @@ def read_conll(fh):
         entries = sentence.strip().split('\n')
         for entry in entries:
             spl = entry.split('\t')
-            print len(spl)
+            # print len(spl)
             predicateList = dict()
             is_pred = False
             if spl[12] == 'Y':
