@@ -73,8 +73,9 @@ if __name__ == '__main__':
         print len(words)
         words = words_ + words[len(words_):]
         print len(words)
+        print len(lemmas)
         lemmas = lemmas_ + lemmas[len(lemmas_):]
-
+        print len(lemmas)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
             pickle.dump((words, lemmas, pos, roles, chars_, options), paramsfp)
         stored_opt.external_embedding = options.pret_dir_emb
