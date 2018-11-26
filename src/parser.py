@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_option("--epochs", type="int", dest="epochs", default=30)
     parser.add_option("--outdir", type="string", dest="outdir", default="results")
     parser.add_option("--pret_dir", type="string", dest="pret_dir", help = 'Pretrained model for loading', default="results")
+    parser.add_option("--pret_dir_emb", type="string", dest="pret_dir_emb", help = 'Pretrained external embedding for pretrained model', default="results")
     parser.add_option("--dynet-autobatch", type="int", default=1)
     parser.add_option("--dynet-mem", type="int", default=10240)
     parser.add_option("--save_epoch", action="store_true", dest="save_epoch", default=False, help='Save each epoch.')
@@ -52,7 +53,6 @@ if __name__ == '__main__':
                       help='pos is not modeled by embeddings or character models')
     parser.add_option("--num_parts", type="int", dest="num_parts", default=1)
     parser.add_option("--silver_dev", action="store_true", dest="silver_dev", default=False, help='Use silver development data')
-
 
 
 
@@ -77,9 +77,26 @@ if __name__ == '__main__':
 
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
             pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
-        stored_opt.external_embedding = options.external_embedding
+        stored_opt.external_embedding = options.pret_dir_emb
         parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.pret_dir, options.model))
+
+        ####
+        external_embedding_fp = open(options.external_embedding, 'r')
+        external_embedding_fp.readline()
+        parser.external_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(' ')[1:]] for line in
+                                   external_embedding_fp}
+        external_embedding_fp.close()
+        parser.edim = len(parser.external_embedding.values()[0])
+        parser.noextrn = [0.0 for _ in xrange(parser.edim)]
+        parser.x_pe_dict = {word: i + 2 for i, word in enumerate(parser.external_embedding)}
+        parser.x_pe = parser.model.add_lookup_parameters((len(parser.external_embedding) + 2, parser.edim))
+        for word, i in parser.x_pe_dict.iteritems():
+            parser.x_pe.init_row(i, parser.external_embedding[word])
+        parser.x_pe.init_row(0, parser.noextrn)
+        parser.x_pe.init_row(1, parser.noextrn)
+        parser.x_pe.set_updated(False)
+        #####
 
         max_len = max([len(d) for d in train_data])
         min_len = min([len(d) for d in train_data])
