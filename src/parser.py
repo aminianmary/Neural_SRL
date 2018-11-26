@@ -71,15 +71,15 @@ if __name__ == '__main__':
         assert len(pos) >= len(pos_)
         assert len(roles) >= len(roles_)
         print len(words)
-        #words = words_ + words[len(words_):]
-        print len(words)
+        new_words = words_ + words[len(words_):]
+        print len(new_words)
         print len(lemmas)
         lemmas = lemmas_ + lemmas[len(lemmas_):]
         print len(lemmas)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
-            pickle.dump((words, lemmas, pos, roles, chars_, options), paramsfp)
+            pickle.dump((new_words, lemmas, pos, roles, chars_, options), paramsfp)
         stored_opt.external_embedding = options.pret_dir_emb
-        parser = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        parser = SRLLSTM(new_words, lemmas, pos, roles, chars, stored_opt)
         parser.Load(os.path.join(options.pret_dir, options.model))
 
         ####
