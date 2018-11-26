@@ -71,7 +71,7 @@ if __name__ == '__main__':
         assert len(pos) >= len(pos_)
         assert len(roles) >= len(roles_)
         print len(words)
-        words = words_ + words[len(words_):]
+        #words = words_ + words[len(words_):]
         print len(words)
         print len(lemmas)
         lemmas = lemmas_ + lemmas[len(lemmas_):]
