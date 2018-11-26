@@ -70,7 +70,9 @@ if __name__ == '__main__':
         assert len(lemmas) >= len(lemmas_)
         assert len(pos) >= len(pos_)
         assert len(roles) >= len(roles_)
+        print len(words)
         words = words_ + words[len(words_):]
+        print len(words)
         lemmas = lemmas_ + lemmas[len(lemmas_):]
 
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
