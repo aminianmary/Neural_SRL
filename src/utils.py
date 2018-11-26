@@ -64,6 +64,8 @@ def vocab(sentences, min_count=2):
     for l in lemma_count.keys():
         if lemma_count[l] >= min_count:
             lemmas.add(l)
+    #todo add sorted (chars and pos are more important)
+    #todo sort word count and lemma based on freq
     return (list(words), list(lemmas),
             list(posCount), list(semRelCount.keys()), list(chars))
 

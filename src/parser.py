@@ -65,6 +65,16 @@ if __name__ == '__main__':
         train_data = list(utils.read_conll(options.conll_train))
         with open(os.path.join(options.pret_dir, options.params), 'r') as paramsfp:
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
+        words_, lemmas_, pos_, roles_, chars_ = utils.vocab(train_data)
+        assert len(words) >= len(words_)
+        assert len(lemmas) >= len(lemmas_)
+        assert len(pos) >= len(pos_)
+        assert len(roles) >= len(roles_)
+        assert len(chars) >= len(chars_)
+        words = words_ + words[len(words_):]
+        lemmas = lemmas_ + lemmas[len(lemmas_):]
+        chars = chars_ + chars[len(chars_):]
+
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
             pickle.dump((words, lemmas, pos, roles, chars, options), paramsfp)
         stored_opt.external_embedding = options.external_embedding
