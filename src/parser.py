@@ -71,10 +71,10 @@ if __name__ == '__main__':
         assert len(pos) >= len(pos_)
         assert len(roles) >= len(roles_)
         print len(words)
-        new_words = words_ + words[len(words_):]
+        new_words = words_ + ['dUmMy_'+str(i) for i in range(len(words_), len(words))]
         print len(new_words)
         print len(lemmas)
-        lemmas = lemmas_ + lemmas[len(lemmas_):]
+        lemmas = lemmas_ + ['dUmMy_'+str(i) for i in range(len(lemmas_), len(lemmas))]
         print len(lemmas)
         with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
             pickle.dump((new_words, lemmas, pos, roles, chars_, options), paramsfp)
