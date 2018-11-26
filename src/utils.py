@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-import re, codecs, random
+import re, codecs, random, operator
 import numpy as np
 
 class ConllStruct:
@@ -55,19 +55,29 @@ def vocab(sentences, min_count=2):
                     semRelCount.update([pred])
             for c in list(node.norm):
                     chars.add(c.lower())
-
-    words = set()
+    words = dict()
     for w in wordsCount.keys():
         if wordsCount[w] >= min_count:
-            words.add(w)
-    lemmas = set()
+            words[w] = wordsCount[w]
+    words = [w[0] for w in sorted(words.items(), key=operator.itemgetter(1), reverse = True)]
+
+    lemmas = dict()
     for l in lemma_count.keys():
         if lemma_count[l] >= min_count:
-            lemmas.add(l)
-    #todo add sorted (chars and pos are more important)
-    #todo sort word count and lemma based on freq
-    return (list(words), list(lemmas),
-            list(posCount), list(semRelCount.keys()), list(chars))
+            lemmas[l] = lemma_count[l]
+    lemmas = [l[0] for l in sorted(lemmas.items(), key=operator.itemgetter(1), reverse = True)]
+
+    roles = dict()
+    for r in semRelCount.keys():
+        roles[r] = semRelCount[r]
+    roles = [r[0] for r in sorted(roles.items(), key=operator.itemgetter(1), reverse = True)]
+
+    pos_set = dict()
+    for p in posCount.keys():
+        pos_set[p] = posCount[p]
+    pos_set = [p[0] for p in sorted(pos_set.items(), key=operator.itemgetter(1), reverse = True)]
+
+    return (words, lemmas,pos_set,roles,list(sorted(chars)))
 
 def read_conll(fh):
     sentences = codecs.open(fh, 'r').read().strip().split('\n\n')
