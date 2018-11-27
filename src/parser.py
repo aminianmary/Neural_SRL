@@ -62,46 +62,20 @@ if __name__ == '__main__':
 
 
     if options.conll_train and options.pret_dir:
-        train_data = list(utils.read_conll(options.conll_train))
         with open(os.path.join(options.pret_dir, options.params), 'r') as paramsfp:
             words, lemmas, pos, roles, chars, stored_opt = pickle.load(paramsfp)
-        words_, lemmas_, pos_, roles_, chars_ = utils.vocab(train_data)
-        assert len(words) >= len(words_)
-        assert len(lemmas) >= len(lemmas_)
-        assert len(pos) >= len(pos_)
-        assert len(roles) >= len(roles_)
-        print len(words)
-        new_words = words_ + ['dUmMy_'+str(i) for i in range(len(words_), len(words))]
-        print len(new_words)
-        print len(lemmas)
-        lemmas = lemmas_ + ['dUmMy_'+str(i) for i in range(len(lemmas_), len(lemmas))]
-        print len(lemmas)
-        with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
-            pickle.dump((new_words, lemmas, pos, roles, chars_, options), paramsfp)
         stored_opt.external_embedding = options.pret_dir_emb
-        parser = SRLLSTM(new_words, lemmas, pos, roles, chars, stored_opt)
-        parser.Load(os.path.join(options.pret_dir, options.model))
+        teacher_model = SRLLSTM(words, lemmas, pos, roles, chars, stored_opt)
+        teacher_model.Load(os.path.join(options.pret_dir, options.model))
 
-        ####
-        parser.chars = {c: i + 2 for i, c in enumerate(chars_)} #0 for UNK, 1 for PAD
-        parser.ce = parser.model.add_lookup_parameters((len(chars_) + 2, options.d_c)) \
-            if (not parser.use_lemma or not parser.use_pos) else None
+        train_data = list(utils.read_conll(options.conll_train))
+        new_words, new_lemmas, new_pos, new_roles, new_chars = utils.vocab(train_data)
+        with open(os.path.join(options.outdir, options.params), 'w') as paramsfp:
+            pickle.dump((new_words, new_lemmas, new_pos, new_roles, new_chars, options), paramsfp)
+        parser = SRLLSTM(new_words, new_lemmas, new_pos, new_roles, new_chars, options)
+        parser.loadTeacherModelValues(teacher_model)
 
-        external_embedding_fp = open(options.external_embedding, 'r')
-        external_embedding_fp.readline()
-        parser.external_embedding = {line.split(' ')[0]: [float(f) for f in line.strip().split(' ')[1:]] for line in
-                                   external_embedding_fp}
-        external_embedding_fp.close()
-        parser.edim = len(parser.external_embedding.values()[0])
-        parser.noextrn = [0.0 for _ in xrange(parser.edim)]
-        parser.x_pe_dict = {word: i + 2 for i, word in enumerate(parser.external_embedding)}
-        parser.x_pe = parser.model.add_lookup_parameters((len(parser.external_embedding) + 2, parser.edim))
-        for word, i in parser.x_pe_dict.iteritems():
-            parser.x_pe.init_row(i, parser.external_embedding[word])
-        parser.x_pe.init_row(0, parser.noextrn)
-        parser.x_pe.init_row(1, parser.noextrn)
-        parser.x_pe.set_updated(False)
-        #####
+
 
         max_len = max([len(d) for d in train_data])
         min_len = min([len(d) for d in train_data])

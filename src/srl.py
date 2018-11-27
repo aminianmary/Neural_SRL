@@ -80,6 +80,99 @@ class SRLLSTM:
         self.pred_flag.set_updated(False)
         self.U = self.model.add_parameters((self.d_h * 4, self.d_r + self.d_prime_l))
 
+    def loadTeacherModelValues(self, teacherModel):
+        words_covered, lemma_covered, chars_covered, pos_covered, roles_covered = 0, 0, 0, 0, 0
+        for i in range(len(self.words)):
+            if len(teacherModel.words) <= i:
+                break
+            self.x_re.init_row(i, teacherModel.x_re[i].npvalue())
+            words_covered += 1
+        print 'words covered', words_covered,'out of',len(self.words)
+
+        if self.x_le:
+            for i in range(len(self.pred_lemmas) + 3):
+                if len(teacherModel.pred_lemmas) <= i:
+                    break
+                self.x_le.init_row(i, teacherModel.x_le[i].npvalue())
+                lemma_covered += 1
+        print 'lemmas covered', lemma_covered,'out of',len(self.pred_lemmas)
+
+        if self.u_l:
+            for i in range(len(self.pred_lemmas) + 3):
+                if len(teacherModel.pred_lemmas) <= i:
+                    break
+                self.u_l.init_row(i, teacherModel.u_l[i].npvalue())
+
+        if self.x_ce:
+            self.x_ce.init_row(0, teacherModel.x_ce[0].npvalue())
+            self.x_ce.init_row(1, teacherModel.x_ce[1].npvalue())
+            for char in self.chars.keys():
+                if char in teacherModel.chars:
+                    s_c, t_c = self.chars[char], teacherModel.chars[char]
+                    self.x_ce.init_row(s_c, teacherModel.x_ce[t_c].npvalue())
+                    chars_covered += 1
+            print 'chars covered', chars_covered, 'out of', len(self.chars)
+
+        if self.x_pos:
+            self.x_pos.init_row(0, teacherModel.x_pos[0].npvalue())
+            self.x_pos.init_row(1, teacherModel.x_pos[1].npvalue())
+            for t in self.pos.keys():
+                if t in teacherModel.pos:
+                    s_c, t_c = self.pos[t], teacherModel.pos[t]
+                    self.x_pos.init_row(s_c, teacherModel.x_pos[t_c].npvalue())
+                    pos_covered += 1
+            print 'pos covered', pos_covered, 'out of', len(self.pos)
+
+
+        self.v_r.init_row(0, teacherModel.v_r[0].npvalue())
+        self.v_r.init_row(1, teacherModel.v_r[1].npvalue())
+        for role in self.roles.keys():
+            if role in teacherModel.roles:
+                s_c, t_c = self.roles[role], teacherModel.roles[role]
+                self.v_r.init_row(s_c, teacherModel.v_r[t_c].npvalue())
+                roles_covered += 1
+        print 'roles covered', roles_covered, 'out of', len(self.roles)
+
+        self.U.set_value(teacherModel.U.npvalue())
+
+        for i in range(len(self.deep_lstms.builder_layers)):
+            builder = self.deep_lstms.builder_layers[i]
+            teacher_builder = teacherModel.deep_lstm.builder_layers[i]
+            params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
+            teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
+            for j in range(len(params)):
+                params[j].set_value(teacher_params[j].npvalue())
+
+        if self.lemma_char_lstm:
+            for i in range(len(self.lemma_char_lstm.builder_layers)):
+                builder = self.lemma_char_lstm.builder_layers[i]
+                teacher_builder = teacherModel.lemma_char_lstm.builder_layers[i]
+                params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
+                teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
+                for j in range(len(params)):
+                    params[j].set_value(teacher_params[j].npvalue())
+
+        if self.pos_char_lstm:
+            for i in range(len(self.pos_char_lstm.builder_layers)):
+                builder = self.pos_char_lstm.builder_layers[i]
+                teacher_builder = teacherModel.pos_char_lstm.builder_layers[i]
+                params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
+                teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
+                for j in range(len(params)):
+                    params[j].set_value(teacher_params[j].npvalue())
+
+        if self.u_l_char_lstm:
+            for i in range(len(self.u_l_char_lstm.builder_layers)):
+                builder = self.u_l_char_lstm.builder_layers[i]
+                teacher_builder = teacherModel.u_l_char_lstm.builder_layers[i]
+                params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
+                teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
+                for j in range(len(params)):
+                    params[j].set_value(teacher_params[j].npvalue())
+
+        renew_cg()
+
+
     def Save(self, filename):
         self.model.save(filename)
 
