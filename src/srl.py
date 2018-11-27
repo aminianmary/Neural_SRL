@@ -312,7 +312,7 @@ class SRLLSTM:
                     #evaluation
                     silver_dev_file = options.outdir + '/silver_dev_'+str(epoch + 1)
                     dev_evaluation = replace_unk_with_system_output(dev_path, sys_output_file, silver_dev_file) if silver_dev else dev_path
-                    os.system('perl /Users/monadiab/Neural_SRL/eval.pl -g ' + dev_evaluation + ' -s ' + sys_output_file + ' > '
+                    os.system('perl ~/bible_experiments/eval.pl -g ' + dev_evaluation + ' -s ' + sys_output_file + ' > '
                               + os.path.join(options.outdir, options.model) + str(epoch + 1) + "_" + str(part) + '.eval')
 
                     print 'Finished predicting dev on part '+ str(part)+ '; time:', time.time() - start
