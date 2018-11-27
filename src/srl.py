@@ -172,7 +172,7 @@ class SRLLSTM:
     def decode(self, minibatches):
         outputs = [list() for _ in range(len(minibatches))]
         for b, batch in enumerate(minibatches):
-            print 'batch '+ str(b)
+            # print 'batch '+ str(b)
             outputs[b] = concatenate_cols(self.buildGraph(batch, False)).npvalue()
             renew_cg()
         print 'decoded all the batches! YAY!'

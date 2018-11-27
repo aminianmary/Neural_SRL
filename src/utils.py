@@ -83,7 +83,7 @@ def read_conll(fh):
     sentences = codecs.open(fh, 'r').read().strip().split('\n\n')
     read = 0
     for i,sentence in enumerate(sentences):
-        print i
+        # print i
         words = []
         predicates = list()
         entries = sentence.strip().split('\n')
