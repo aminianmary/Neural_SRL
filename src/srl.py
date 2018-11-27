@@ -137,11 +137,11 @@ class SRLLSTM:
 
         for i in range(len(self.deep_lstms.builder_layers)):
             builder = self.deep_lstms.builder_layers[i]
-            teacher_builder = teacherModel.deep_lstm.builder_layers[i]
+            teacher_builder = teacherModel.deep_lstms.builder_layers[i]
             params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
             teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
             for j in range(len(params)):
-                params[j].set_value(teacher_params[j].npvalue())
+                params[j].set_value(teacher_params[j].expr().npvalue())
 
         if self.lemma_char_lstm:
             for i in range(len(self.lemma_char_lstm.builder_layers)):
@@ -150,7 +150,7 @@ class SRLLSTM:
                 params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
                 teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
                 for j in range(len(params)):
-                    params[j].set_value(teacher_params[j].npvalue())
+                    params[j].set_value(teacher_params[j].expr().npvalue())
 
         if self.pos_char_lstm:
             for i in range(len(self.pos_char_lstm.builder_layers)):
@@ -159,7 +159,7 @@ class SRLLSTM:
                 params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
                 teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
                 for j in range(len(params)):
-                    params[j].set_value(teacher_params[j].npvalue())
+                    params[j].set_value(teacher_params[j].expr().npvalue())
 
         if self.u_l_char_lstm:
             for i in range(len(self.u_l_char_lstm.builder_layers)):
@@ -168,7 +168,7 @@ class SRLLSTM:
                 params = builder[0].get_parameters()[0] + builder[1].get_parameters()[0]
                 teacher_params = teacher_builder[0].get_parameters()[0] + teacher_builder[1].get_parameters()[0]
                 for j in range(len(params)):
-                    params[j].set_value(teacher_params[j].npvalue())
+                    params[j].set_value(teacher_params[j].expr().npvalue())
 
         renew_cg()
 
