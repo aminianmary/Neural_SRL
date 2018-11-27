@@ -95,7 +95,7 @@ class SRLLSTM:
                     break
                 self.x_le.init_row(i, teacherModel.x_le[i].npvalue())
                 lemma_covered += 1
-        print 'lemmas covered', lemma_covered,'out of',len(self.pred_lemmas)
+            print 'lemmas covered', lemma_covered,'out of',len(self.pred_lemmas)
 
         if self.u_l:
             for i in range(len(self.pred_lemmas) + 3):
@@ -133,7 +133,7 @@ class SRLLSTM:
                 roles_covered += 1
         print 'roles covered', roles_covered, 'out of', len(self.roles)
 
-        self.U.set_value(teacherModel.U.npvalue())
+        self.U.set_value(teacherModel.U.expr().npvalue())
 
         for i in range(len(self.deep_lstms.builder_layers)):
             builder = self.deep_lstms.builder_layers[i]
