@@ -103,13 +103,13 @@ class SRLLSTM:
                     break
                 self.u_l.init_row(i, teacherModel.u_l[i].npvalue())
 
-        if self.x_ce:
-            self.x_ce.init_row(0, teacherModel.x_ce[0].npvalue())
-            self.x_ce.init_row(1, teacherModel.x_ce[1].npvalue())
+        if self.ce:
+            self.ce.init_row(0, teacherModel.ce[0].npvalue())
+            self.ce.init_row(1, teacherModel.ce[1].npvalue())
             for char in self.chars.keys():
                 if char in teacherModel.chars:
                     s_c, t_c = self.chars[char], teacherModel.chars[char]
-                    self.x_ce.init_row(s_c, teacherModel.x_ce[t_c].npvalue())
+                    self.ce.init_row(s_c, teacherModel.ce[t_c].npvalue())
                     chars_covered += 1
             print 'chars covered', chars_covered, 'out of', len(self.chars)
 
